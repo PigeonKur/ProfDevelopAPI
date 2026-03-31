@@ -16,9 +16,9 @@ public class ProgressService : IProgressService
             ?? throw new KeyNotFoundException("Урок не найден");
 
         // Порог прохождения — 70%
-        var passed   = request.MaxScore > 0
+        var passed = request.MaxScore > 0
                     && (request.Score * 100 / request.MaxScore) >= 70;
-        var xpEarned = passed ? lesson.XpReward ?? 10 : 0;
+        var xpEarned = passed ? lesson.XpReward : 0;
 
         // Создаём или обновляем прогресс
         var progress = await _db.LessonProgresses
@@ -28,7 +28,7 @@ public class ProgressService : IProgressService
         {
             progress = new LessonProgress
             {
-                UserId   = userId,
+                UserId = userId,
                 LessonId = request.LessonId,
                 Attempts = 1
             };
@@ -42,9 +42,9 @@ public class ProgressService : IProgressService
         // Записываем только если результат лучше предыдущего
         if (!progress.IsCompleted || request.Score > progress.Score)
         {
-            progress.Score       = request.Score;
-            progress.MaxScore    = request.MaxScore;
-            progress.XpEarned   = xpEarned;
+            progress.Score = request.Score;
+            progress.MaxScore = request.MaxScore;
+            progress.XpEarned = xpEarned;
             progress.IsCompleted = passed;
             if (passed) progress.CompletedAt = DateTime.UtcNow;
             progress.UpdatedAt = DateTime.UtcNow;
@@ -61,19 +61,19 @@ public class ProgressService : IProgressService
         if (passed)
         {
             stats.TotalXp += xpEarned;
-            stats.Level    = CalculateLevel(stats.TotalXp ?? 0);
+            stats.Level = CalculateLevel(stats.TotalXp);
         }
 
         // Обновляем streak
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         if (stats.LastActiveDate == null || stats.LastActiveDate < today)
         {
-            var yesterday   = today.AddDays(-1);
+            var yesterday = today.AddDays(-1);
             stats.StreakDays = (stats.LastActiveDate == yesterday)
-                ? (stats.StreakDays ?? 0) + 1
+                ? stats.StreakDays + 1
                 : 1;
 
-            if (stats.StreakDays > (stats.MaxStreak ?? 0))
+            if (stats.StreakDays > stats.MaxStreak)
                 stats.MaxStreak = stats.StreakDays;
 
             stats.LastActiveDate = today;
@@ -88,9 +88,9 @@ public class ProgressService : IProgressService
         return new SubmitProgressResponse(
             passed,
             xpEarned,
-            stats.TotalXp    ?? 0,
-            stats.Level      ?? 1,
-            stats.StreakDays ?? 0,
+            stats.TotalXp,
+            stats.Level,
+            stats.StreakDays,
             newAchievements
         );
     }
@@ -102,15 +102,15 @@ public class ProgressService : IProgressService
             .ToListAsync();
 
         return progresses.Select(p => new CourseDto(
-            p.CourseId        ?? 0,
-            p.CourseTitle     ?? "",
+            p.CourseId ?? 0,
+            p.CourseTitle ?? "",
             null,
             p.Category,
             null,
             true,
-            (int)(p.TotalLessons     ?? 0),
+            (int)(p.TotalLessons ?? 0),
             (int)(p.CompletedLessons ?? 0),
-            (int)(p.ProgressPct      ?? 0),
+            (int)(p.ProgressPct ?? 0),
             p.IsMandatory,
             p.Deadline
         )).ToList();
@@ -125,12 +125,12 @@ public class ProgressService : IProgressService
 
         _db.CourseAssignments.Add(new CourseAssignment
         {
-            UserId      = request.UserId,
-            CourseId    = request.CourseId,
-            AssignedBy  = assignedBy,
+            UserId = request.UserId,
+            CourseId = request.CourseId,
+            AssignedBy = assignedBy,
             IsMandatory = request.IsMandatory,
-            Deadline    = request.Deadline,
-            AssignedAt  = DateTime.UtcNow
+            Deadline = request.Deadline,
+            AssignedAt = DateTime.UtcNow
         });
 
         // Создаём статистику если ещё нет
@@ -154,7 +154,7 @@ public class ProgressService : IProgressService
             .ToListAsync();
 
         var lessonsCount = await _db.LessonProgresses
-            .CountAsync(p => p.UserId == userId && p.IsCompleted == true);
+            .CountAsync(p => p.UserId == userId && p.IsCompleted);
 
         var coursesCount = await _db.VCourseProgresses
             .CountAsync(p => p.UserId == userId && p.ProgressPct == 100);
@@ -165,20 +165,20 @@ public class ProgressService : IProgressService
         {
             var met = ach.ConditionKey switch
             {
-                "lessons_done" => lessonsCount          >= ach.ConditionValue,
-                "streak_days"  => (stats.StreakDays ?? 0) >= ach.ConditionValue,
-                "total_xp"     => (stats.TotalXp    ?? 0) >= ach.ConditionValue,
-                "courses_done" => coursesCount          >= ach.ConditionValue,
-                _              => false
+                "lessons_done" => lessonsCount >= ach.ConditionValue,
+                "streak_days" => stats.StreakDays >= ach.ConditionValue,
+                "total_xp" => stats.TotalXp >= ach.ConditionValue,
+                "courses_done" => coursesCount >= ach.ConditionValue,
+                _ => false
             };
 
             if (!met) continue;
 
             var ua = new UserAchievement
             {
-                UserId        = userId,
+                UserId = userId,
                 AchievementId = ach.Id,
-                EarnedAt      = DateTime.UtcNow
+                EarnedAt = DateTime.UtcNow
             };
             _db.UserAchievements.Add(ua);
             newAchievements.Add(new AchievementDto(

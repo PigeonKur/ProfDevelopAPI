@@ -33,13 +33,13 @@ public class CourseService : ICourseService
     {
         var course = new Course
         {
-            Title       = request.Title,
+            Title = request.Title,
             Description = request.Description,
-            Category    = request.Category,
+            Category = request.Category,
             IsPublished = request.IsPublished,
-            CreatedBy   = createdBy,
-            CreatedAt   = DateTime.UtcNow,
-            UpdatedAt   = DateTime.UtcNow
+            CreatedBy = createdBy,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         _db.Courses.Add(course);
         await _db.SaveChangesAsync();
@@ -54,11 +54,11 @@ public class CourseService : ICourseService
 
         if (course == null) return null;
 
-        course.Title       = request.Title;
+        course.Title = request.Title;
         course.Description = request.Description;
-        course.Category    = request.Category;
+        course.Category = request.Category;
         course.IsPublished = request.IsPublished;
-        course.UpdatedAt   = DateTime.UtcNow;
+        course.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
         return MapCourse(course);
@@ -92,15 +92,15 @@ public class CourseService : ICourseService
 
         return lessons.Select((l, i) =>
         {
-            var prog       = progresses.FirstOrDefault(p => p.LessonId == l.Id);
+            var prog = progresses.FirstOrDefault(p => p.LessonId == l.Id);
             var isUnlocked = i == 0
-                || progresses.Any(p => p.LessonId == lessons[i - 1].Id && p.IsCompleted == true);
+                || progresses.Any(p => p.LessonId == lessons[i - 1].Id && p.IsCompleted);
 
             return new LessonDto(
                 l.Id,
                 l.Title,
-                l.OrderIndex  ?? 1,
-                l.XpReward    ?? 10,
+                l.OrderIndex,
+                l.XpReward,
                 l.Description,
                 prog?.IsCompleted ?? false,
                 isUnlocked,
@@ -118,20 +118,20 @@ public class CourseService : ICourseService
 
         var lesson = new Lesson
         {
-            CourseId    = request.CourseId,
-            Title       = request.Title,
-            OrderIndex  = maxOrder + 1,
-            XpReward    = request.XpReward,
+            CourseId = request.CourseId,
+            Title = request.Title,
+            OrderIndex = maxOrder + 1,
+            XpReward = request.XpReward,
             Description = request.Description,
-            CreatedAt   = DateTime.UtcNow,
-            UpdatedAt   = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         _db.Lessons.Add(lesson);
         await _db.SaveChangesAsync();
 
         return new LessonDto(
             lesson.Id, lesson.Title,
-            lesson.OrderIndex ?? 1, lesson.XpReward ?? 10,
+            lesson.OrderIndex, lesson.XpReward,
             lesson.Description, false, false, null, null
         );
     }
@@ -159,19 +159,19 @@ public class CourseService : ICourseService
             q.Id,
             q.Type,
             q.Text,
-            q.OrderIndex ?? 1,
+            q.OrderIndex,
             q.Answers
                 .OrderBy(a => a.OrderIndex)
                 .Select(a => new AnswerDto(
                     a.Id,
                     a.Text,
-                    includeCorrect ? (a.IsCorrect ?? false) : false,
-                    a.OrderIndex ?? 1
+                    includeCorrect ? a.IsCorrect : false,
+                    a.OrderIndex
                 )).ToList(),
             q.MatchingPairs
                 .OrderBy(m => m.OrderIndex)
                 .Select(m => new MatchingPairDto(
-                    m.Id, m.LeftText, m.RightText, m.OrderIndex ?? 1
+                    m.Id, m.LeftText, m.RightText, m.OrderIndex
                 )).ToList()
         )).ToList();
     }
@@ -184,11 +184,11 @@ public class CourseService : ICourseService
 
         var question = new Question
         {
-            LessonId   = request.LessonId,
-            Type       = request.Type,
-            Text       = request.Text,
+            LessonId = request.LessonId,
+            Type = request.Type,
+            Text = request.Text,
             OrderIndex = maxOrder + 1,
-            CreatedAt  = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow
         };
         _db.Questions.Add(question);
         await _db.SaveChangesAsync();
@@ -198,8 +198,8 @@ public class CourseService : ICourseService
             _db.Answers.Add(new Answer
             {
                 QuestionId = question.Id,
-                Text       = request.Answers[i].Text,
-                IsCorrect  = request.Answers[i].IsCorrect,
+                Text = request.Answers[i].Text,
+                IsCorrect = request.Answers[i].IsCorrect,
                 OrderIndex = i + 1
             });
         }
@@ -209,8 +209,8 @@ public class CourseService : ICourseService
             _db.MatchingPairs.Add(new MatchingPair
             {
                 QuestionId = question.Id,
-                LeftText   = request.MatchingPairs[i].LeftText,
-                RightText  = request.MatchingPairs[i].RightText,
+                LeftText = request.MatchingPairs[i].LeftText,
+                RightText = request.MatchingPairs[i].RightText,
                 OrderIndex = i + 1
             });
         }
@@ -218,7 +218,7 @@ public class CourseService : ICourseService
         await _db.SaveChangesAsync();
 
         return new QuestionDto(
-            question.Id, question.Type, question.Text, question.OrderIndex ?? 1,
+            question.Id, question.Type, question.Text, question.OrderIndex,
             request.Answers.Select((a, i) =>
                 new AnswerDto(0, a.Text, a.IsCorrect, i + 1)).ToList(),
             request.MatchingPairs.Select((p, i) =>
@@ -238,7 +238,7 @@ public class CourseService : ICourseService
     // ── Маппинг ─────────────────────────────────────────────────────────────
     private static CourseDto MapCourse(Course c) => new(
         c.Id, c.Title, c.Description, c.Category, c.CoverUrl,
-        c.IsPublished ?? false,
+        c.IsPublished,
         c.Lessons.Count,
         null, null, null, null
     );

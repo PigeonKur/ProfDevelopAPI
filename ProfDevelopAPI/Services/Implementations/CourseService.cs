@@ -73,7 +73,6 @@ public class CourseService : ICourseService
         return true;
     }
 
-    // ── Уроки ───────────────────────────────────────────────────────────────
     public async Task<List<LessonDto>> GetLessonsAsync(int courseId, int? userId)
     {
         var lessons = await _db.Lessons
@@ -145,7 +144,6 @@ public class CourseService : ICourseService
         return true;
     }
 
-    // ── Вопросы ─────────────────────────────────────────────────────────────
     public async Task<List<QuestionDto>> GetQuestionsAsync(int lessonId, bool includeCorrect)
     {
         var questions = await _db.Questions
@@ -235,7 +233,6 @@ public class CourseService : ICourseService
         return true;
     }
 
-    // ── Маппинг ─────────────────────────────────────────────────────────────
     private static CourseDto MapCourse(Course c) => new(
         c.Id, c.Title, c.Description, c.Category, c.CoverUrl,
         c.IsPublished,

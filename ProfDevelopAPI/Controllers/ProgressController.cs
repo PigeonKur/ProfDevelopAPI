@@ -17,10 +17,6 @@ public class ProgressController : ControllerBase
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    /// <summary>
-    /// Отправить результат урока (мобилка → API).
-    /// Считает XP, streak, уровень, проверяет достижения.
-    /// </summary>
     [HttpPost]
     public async Task<IActionResult> Submit([FromBody] SubmitProgressRequest request)
     {
@@ -35,12 +31,10 @@ public class ProgressController : ControllerBase
         }
     }
 
-    /// <summary>Назначенные курсы с прогрессом текущего пользователя</summary>
     [HttpGet("my-courses")]
     public async Task<IActionResult> MyCourses()
         => Ok(await _progress.GetUserCoursesAsync(CurrentUserId));
 
-    /// <summary>Назначить курс сотруднику [admin, hr] — используется в Avalonia</summary>
     [HttpPost("assign")]
     [Authorize(Roles = "admin,hr")]
     public async Task<IActionResult> Assign([FromBody] AssignCourseRequest request)

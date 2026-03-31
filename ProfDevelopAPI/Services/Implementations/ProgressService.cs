@@ -15,12 +15,10 @@ public class ProgressService : IProgressService
         var lesson = await _db.Lessons.FindAsync(request.LessonId)
             ?? throw new KeyNotFoundException("Урок не найден");
 
-        // Порог прохождения — 70%
         var passed = request.MaxScore > 0
                     && (request.Score * 100 / request.MaxScore) >= 70;
         var xpEarned = passed ? lesson.XpReward : 0;
 
-        // Создаём или обновляем прогресс
         var progress = await _db.LessonProgresses
             .FirstOrDefaultAsync(p => p.UserId == userId && p.LessonId == request.LessonId);
 
@@ -39,7 +37,6 @@ public class ProgressService : IProgressService
             progress.Attempts++;
         }
 
-        // Записываем только если результат лучше предыдущего
         if (!progress.IsCompleted || request.Score > progress.Score)
         {
             progress.Score = request.Score;
@@ -50,7 +47,6 @@ public class ProgressService : IProgressService
             progress.UpdatedAt = DateTime.UtcNow;
         }
 
-        // Обновляем статистику пользователя
         var stats = await _db.UserStats.FindAsync(userId);
         if (stats == null)
         {
@@ -64,7 +60,6 @@ public class ProgressService : IProgressService
             stats.Level = CalculateLevel(stats.TotalXp);
         }
 
-        // Обновляем streak
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         if (stats.LastActiveDate == null || stats.LastActiveDate < today)
         {
@@ -82,7 +77,6 @@ public class ProgressService : IProgressService
 
         await _db.SaveChangesAsync();
 
-        // Проверяем новые достижения
         var newAchievements = await CheckAchievementsAsync(userId, stats);
 
         return new SubmitProgressResponse(
@@ -133,7 +127,6 @@ public class ProgressService : IProgressService
             AssignedAt = DateTime.UtcNow
         });
 
-        // Создаём статистику если ещё нет
         if (!await _db.UserStats.AnyAsync(s => s.UserId == request.UserId))
             _db.UserStats.Add(new UserStat { UserId = request.UserId });
 
@@ -141,7 +134,6 @@ public class ProgressService : IProgressService
         return true;
     }
 
-    // ── Вспомогательные ─────────────────────────────────────────────────────
     private static int CalculateLevel(int xp) => xp / 100 + 1;
 
     private async Task<List<AchievementDto>> CheckAchievementsAsync(int userId, UserStat stats)

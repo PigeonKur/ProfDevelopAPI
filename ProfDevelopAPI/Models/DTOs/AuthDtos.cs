@@ -1,6 +1,5 @@
 namespace ProfDevelopAPI.Models.DTOs;
 
-// ── Запросы ────────────────────────────────────────────────────────────────
 public record LoginRequest(
     string Email,
     string Password,
@@ -11,22 +10,21 @@ public record RefreshRequest(
     string RefreshToken
 );
 
-// ── Ответы ─────────────────────────────────────────────────────────────────
 public record AuthResponse(
-    string         AccessToken,
-    string         RefreshToken,
+    string AccessToken,
+    string RefreshToken,
     UserProfileDto User
 );
 
 public record UserProfileDto(
-    int     Id,
-    string  FullName,
-    string  Email,
-    string  Role,
+    int Id,
+    string FullName,
+    string Email,
+    string Role,
     string? PositionTitle,
     string? DepartmentName,
-    int     TotalXp,
-    int     Level,
-    int     StreakDays,
+    int TotalXp,
+    int Level,
+    int StreakDays,
     string? AvatarUrl
 );

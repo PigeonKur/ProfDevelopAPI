@@ -26,21 +26,20 @@ public class UserService : IUserService
     {
         var user = new User
         {
-            FullName     = request.FullName,
-            Email        = request.Email,
+            FullName = request.FullName,
+            Email = request.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role         = request.Role,
-            PositionId   = request.PositionId,
+            Role = request.Role,
+            PositionId = request.PositionId,
             DepartmentId = request.DepartmentId,
-            Phone        = request.Phone,
-            IsActive     = true,
-            CreatedAt    = DateTime.UtcNow,
-            UpdatedAt    = DateTime.UtcNow
+            Phone = request.Phone,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
-        // Создаём статистику сразу при регистрации
         _db.UserStats.Add(new UserStat { UserId = user.Id });
         await _db.SaveChangesAsync();
 
@@ -52,12 +51,12 @@ public class UserService : IUserService
         var user = await _db.Users.FindAsync(id);
         if (user == null) return null;
 
-        user.FullName     = request.FullName;
-        user.Phone        = request.Phone;
-        user.PositionId   = request.PositionId;
+        user.FullName = request.FullName;
+        user.Phone = request.Phone;
+        user.PositionId = request.PositionId;
         user.DepartmentId = request.DepartmentId;
-        user.IsActive     = request.IsActive;
-        user.UpdatedAt    = DateTime.UtcNow;
+        user.IsActive = request.IsActive;
+        user.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
         return await GetByIdAsync(id);
@@ -68,7 +67,7 @@ public class UserService : IUserService
         var user = await _db.Users.FindAsync(id);
         if (user == null) return false;
 
-        user.IsActive  = false;
+        user.IsActive = false;
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         return true;
@@ -90,8 +89,8 @@ public class UserService : IUserService
         var rows = await _db.VLeaderboards.ToListAsync();
         return rows.Select(r => new LeaderboardEntryDto(
             r.Rank,
-            r.Id         ?? 0,
-            r.FullName   ?? "",
+            r.Id ?? 0,
+            r.FullName ?? "",
             r.AvatarUrl,
             r.PositionTitle,
             r.TotalXp,
@@ -115,15 +114,14 @@ public class UserService : IUserService
             .ToListAsync();
     }
 
-    // ── Маппинг ─────────────────────────────────────────────────────────────
     private static UserListDto MapUserList(VUserFull u) => new(
-        u.Id             ?? 0,
-        u.FullName       ?? "",
-        u.Email          ?? "",
-        u.Role           ?? "",
+        u.Id ?? 0,
+        u.FullName ?? "",
+        u.Email ?? "",
+        u.Role ?? "",
         u.PositionTitle,
         u.DepartmentName,
-        u.IsActive       ?? false,
+        u.IsActive ?? false,
         u.TotalXp,
         u.Level,
         u.StreakDays,

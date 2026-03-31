@@ -13,11 +13,11 @@ namespace ProfDevelopAPI.Services.Implementations;
 public class AuthService : IAuthService
 {
     private readonly PostgresContext _db;
-    private readonly IConfiguration  _cfg;
+    private readonly IConfiguration _cfg;
 
     public AuthService(PostgresContext db, IConfiguration cfg)
     {
-        _db  = db;
+        _db = db;
         _cfg = cfg;
     }
 
@@ -32,7 +32,6 @@ public class AuthService : IAuthService
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             return null;
 
-        // Отзываем старые токены этого устройства
         var oldTokens = await _db.RefreshTokens
             .Where(t => t.UserId == user.Id
                      && t.DeviceInfo == request.DeviceInfo
@@ -40,7 +39,7 @@ public class AuthService : IAuthService
             .ToListAsync();
         oldTokens.ForEach(t => t.RevokedAt = DateTime.UtcNow);
 
-        var accessToken  = GenerateAccessToken(user);
+        var accessToken = GenerateAccessToken(user);
         var refreshToken = CreateRefreshToken(user.Id, request.DeviceInfo, ipAddress);
         _db.RefreshTokens.Add(refreshToken);
 
@@ -60,9 +59,8 @@ public class AuthService : IAuthService
         if (token == null || token.RevokedAt != null || token.ExpiresAt < DateTime.UtcNow)
             return null;
 
-        // Ротация токена
-        token.RevokedAt  = DateTime.UtcNow;
-        var newRefresh   = CreateRefreshToken(token.UserId, token.DeviceInfo, ipAddress);
+        token.RevokedAt = DateTime.UtcNow;
+        var newRefresh = CreateRefreshToken(token.UserId, token.DeviceInfo, ipAddress);
         _db.RefreshTokens.Add(newRefresh);
 
         var accessToken = GenerateAccessToken(token.User);
@@ -83,12 +81,11 @@ public class AuthService : IAuthService
         }
     }
 
-    // ── Приватные методы ────────────────────────────────────────────────────
     private string GenerateAccessToken(User user)
     {
-        var jwt    = _cfg.GetSection("JwtSettings");
-        var key    = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["SecretKey"]!));
-        var creds  = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var jwt = _cfg.GetSection("JwtSettings");
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["SecretKey"]!));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expiry = DateTime.UtcNow.AddMinutes(int.Parse(jwt["AccessTokenExpiryMinutes"]!));
 
         var claims = new[]
@@ -100,10 +97,10 @@ public class AuthService : IAuthService
         };
 
         var tokenObj = new JwtSecurityToken(
-            issuer:             jwt["Issuer"],
-            audience:           jwt["Audience"],
-            claims:             claims,
-            expires:            expiry,
+            issuer: jwt["Issuer"],
+            audience: jwt["Audience"],
+            claims: claims,
+            expires: expiry,
             signingCredentials: creds
         );
 
@@ -115,12 +112,12 @@ public class AuthService : IAuthService
         var jwt = _cfg.GetSection("JwtSettings");
         return new RefreshToken
         {
-            UserId     = userId,
-            Token      = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+            UserId = userId,
+            Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
             DeviceInfo = deviceInfo,
-            IpAddress  = ipAddress,
-            ExpiresAt  = DateTime.UtcNow.AddDays(int.Parse(jwt["RefreshTokenExpiryDays"]!)),
-            CreatedAt  = DateTime.UtcNow
+            IpAddress = ipAddress,
+            ExpiresAt = DateTime.UtcNow.AddDays(int.Parse(jwt["RefreshTokenExpiryDays"]!)),
+            CreatedAt = DateTime.UtcNow
         };
     }
 
@@ -131,8 +128,8 @@ public class AuthService : IAuthService
         u.Role ?? "employee",
         u.Position?.Title,
         u.Department?.Name,
-        u.UserStat?.TotalXp    ?? 0,
-        u.UserStat?.Level      ?? 1,
+        u.UserStat?.TotalXp ?? 0,
+        u.UserStat?.Level ?? 1,
         u.UserStat?.StreakDays ?? 0,
         u.AvatarUrl
     );

@@ -12,11 +12,10 @@ public class AuthController : ControllerBase
     private readonly IAuthService _auth;
     public AuthController(IAuthService auth) => _auth = auth;
 
-    /// <summary>Вход — возвращает JWT + Refresh токен</summary>
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var ip     = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var result = await _auth.LoginAsync(request, ip);
 
         return result == null
@@ -24,11 +23,10 @@ public class AuthController : ControllerBase
             : Ok(result);
     }
 
-    /// <summary>Обновить Access токен по Refresh токену</summary>
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
-        var ip     = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var result = await _auth.RefreshAsync(request.RefreshToken, ip);
 
         return result == null
@@ -36,7 +34,6 @@ public class AuthController : ControllerBase
             : Ok(result);
     }
 
-    /// <summary>Выход — отзыв Refresh токена</summary>
     [HttpPost("logout")]
     [Authorize]
     public async Task<IActionResult> Logout([FromBody] RefreshRequest request)

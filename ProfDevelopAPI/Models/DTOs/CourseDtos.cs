@@ -84,6 +84,13 @@ public record CreateQuestionRequest(
     List<CreatePairRequest> MatchingPairs
 );
 
+public record UpdateQuestionRequest(
+    string Type,
+    string Text,
+    List<CreateAnswerRequest> Answers,
+    List<CreatePairRequest> MatchingPairs
+);
+
 public record CreateAnswerRequest(
     string Text,
     bool IsCorrect

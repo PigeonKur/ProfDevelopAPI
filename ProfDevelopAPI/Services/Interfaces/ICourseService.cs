@@ -16,5 +16,6 @@ public interface ICourseService
 
     Task<List<QuestionDto>> GetQuestionsAsync(int lessonId, bool includeCorrect);
     Task<QuestionDto> CreateQuestionAsync(CreateQuestionRequest request);
+    Task<QuestionDto?> UpdateQuestionAsync(int id, UpdateQuestionRequest request, bool includeCorrect);
     Task<bool> DeleteQuestionAsync(int id);
 }

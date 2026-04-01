@@ -149,6 +149,7 @@ public class CourseService : ICourseService
         var questions = await _db.Questions
             .Include(q => q.Answers)
             .Include(q => q.MatchingPairs)
+            .AsSplitQuery()
             .Where(q => q.LessonId == lessonId)
             .OrderBy(q => q.OrderIndex)
             .ToListAsync();
@@ -221,6 +222,72 @@ public class CourseService : ICourseService
                 new AnswerDto(0, a.Text, a.IsCorrect, i + 1)).ToList(),
             request.MatchingPairs.Select((p, i) =>
                 new MatchingPairDto(0, p.LeftText, p.RightText, i + 1)).ToList()
+        );
+    }
+
+    public async Task<QuestionDto?> UpdateQuestionAsync(int id, UpdateQuestionRequest request, bool includeCorrect)
+    {
+        var question = await _db.Questions
+            .Include(q => q.Answers)
+            .Include(q => q.MatchingPairs)
+            .FirstOrDefaultAsync(q => q.Id == id);
+
+        if (question == null) return null;
+
+        question.Type = request.Type;
+        question.Text = request.Text;
+
+        _db.Answers.RemoveRange(question.Answers);
+        _db.MatchingPairs.RemoveRange(question.MatchingPairs);
+
+        for (int i = 0; i < request.Answers.Count; i++)
+        {
+            _db.Answers.Add(new Answer
+            {
+                QuestionId = question.Id,
+                Text = request.Answers[i].Text,
+                IsCorrect = request.Answers[i].IsCorrect,
+                OrderIndex = i + 1
+            });
+        }
+
+        for (int i = 0; i < request.MatchingPairs.Count; i++)
+        {
+            _db.MatchingPairs.Add(new MatchingPair
+            {
+                QuestionId = question.Id,
+                LeftText = request.MatchingPairs[i].LeftText,
+                RightText = request.MatchingPairs[i].RightText,
+                OrderIndex = i + 1
+            });
+        }
+
+        await _db.SaveChangesAsync();
+
+        var updated = await _db.Questions
+            .Include(q => q.Answers)
+            .Include(q => q.MatchingPairs)
+            .AsSplitQuery()
+            .FirstAsync(q => q.Id == id);
+
+        return new QuestionDto(
+            updated.Id,
+            updated.Type,
+            updated.Text,
+            updated.OrderIndex,
+            updated.Answers
+                .OrderBy(a => a.OrderIndex)
+                .Select(a => new AnswerDto(
+                    a.Id,
+                    a.Text,
+                    includeCorrect ? a.IsCorrect : false,
+                    a.OrderIndex
+                )).ToList(),
+            updated.MatchingPairs
+                .OrderBy(m => m.OrderIndex)
+                .Select(m => new MatchingPairDto(
+                    m.Id, m.LeftText, m.RightText, m.OrderIndex
+                )).ToList()
         );
     }
 

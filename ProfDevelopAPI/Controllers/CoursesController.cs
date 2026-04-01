@@ -75,6 +75,14 @@ public class CoursesController : ControllerBase
     public async Task<IActionResult> CreateQuestion([FromBody] CreateQuestionRequest request)
         => Ok(await _courses.CreateQuestionAsync(request));
 
+    [HttpPut("questions/{id}")]
+    [Authorize(Roles = "admin,hr")]
+    public async Task<IActionResult> UpdateQuestion(int id, [FromBody] UpdateQuestionRequest request)
+    {
+        var question = await _courses.UpdateQuestionAsync(id, request, includeCorrect: IsAdmin);
+        return question == null ? NotFound() : Ok(question);
+    }
+
     [HttpDelete("questions/{id}")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> DeleteQuestion(int id)

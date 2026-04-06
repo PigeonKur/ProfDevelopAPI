@@ -61,6 +61,19 @@ public class CoursesController : ControllerBase
     public async Task<IActionResult> CreateLesson([FromBody] CreateLessonRequest request)
         => Ok(await _courses.CreateLessonAsync(request));
 
+    [HttpPut("lessons/{id}")]
+    [Authorize(Roles = "admin,hr")]
+    public async Task<IActionResult> UpdateLesson(int id, [FromBody] UpdateLessonRequest request)
+    {
+        var lesson = await _courses.UpdateLessonAsync(id, request);
+        return lesson == null ? NotFound() : Ok(lesson);
+    }
+
+    [HttpPut("{courseId}/lessons/reorder")]
+    [Authorize(Roles = "admin,hr")]
+    public async Task<IActionResult> ReorderLessons(int courseId, [FromBody] ReorderItemsRequest request)
+        => await _courses.ReorderLessonsAsync(courseId, request) ? NoContent() : BadRequest();
+
     [HttpDelete("lessons/{id}")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> DeleteLesson(int id)
@@ -82,6 +95,11 @@ public class CoursesController : ControllerBase
         var question = await _courses.UpdateQuestionAsync(id, request, includeCorrect: IsAdmin);
         return question == null ? NotFound() : Ok(question);
     }
+
+    [HttpPut("lessons/{lessonId}/questions/reorder")]
+    [Authorize(Roles = "admin,hr")]
+    public async Task<IActionResult> ReorderQuestions(int lessonId, [FromBody] ReorderItemsRequest request)
+        => await _courses.ReorderQuestionsAsync(lessonId, request) ? NoContent() : BadRequest();
 
     [HttpDelete("questions/{id}")]
     [Authorize(Roles = "admin")]

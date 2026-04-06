@@ -73,14 +73,40 @@ public class UserService : IUserService
         return true;
     }
 
+    public async Task<UserLookupsDto> GetLookupsAsync()
+    {
+        var departments = await _db.Departments
+            .OrderBy(d => d.Name)
+            .Select(d => new LookupItemDto(d.Id, d.Name))
+            .ToListAsync();
+
+        var positions = await _db.Positions
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.Title)
+            .Select(p => new LookupItemDto(p.Id, p.Title))
+            .ToListAsync();
+
+        return new UserLookupsDto(departments, positions);
+    }
+
     public async Task<AdminStatsDto> GetAdminStatsAsync()
     {
-        var s = await _db.VAdminStats.FirstOrDefaultAsync();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var totalEmployees = await _db.Users.CountAsync(u => u.Role == "employee");
+        var activeToday = await _db.UserStats.CountAsync(s => s.LastActiveDate == today);
+        var publishedCourses = await _db.Courses.CountAsync(c => c.IsPublished);
+
+        var avgScorePct = await _db.LessonProgresses
+            .Where(p => p.MaxScore > 0)
+            .Select(p => (decimal?)p.Score * 100m / p.MaxScore)
+            .AverageAsync();
+
         return new AdminStatsDto(
-            s?.TotalEmployees,
-            s?.ActiveToday,
-            s?.PublishedCourses,
-            s?.AvgScorePct
+            totalEmployees,
+            activeToday,
+            publishedCourses,
+            avgScorePct
         );
     }
 

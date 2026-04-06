@@ -35,6 +35,11 @@ public class ProgressController : ControllerBase
     public async Task<IActionResult> MyCourses()
         => Ok(await _progress.GetUserCoursesAsync(CurrentUserId));
 
+    [HttpGet("users/{userId:int}/courses")]
+    [Authorize(Roles = "admin,hr")]
+    public async Task<IActionResult> UserCourses(int userId)
+        => Ok(await _progress.GetUserCoursesAsync(userId));
+
     [HttpPost("assign")]
     [Authorize(Roles = "admin,hr")]
     public async Task<IActionResult> Assign([FromBody] AssignCourseRequest request)

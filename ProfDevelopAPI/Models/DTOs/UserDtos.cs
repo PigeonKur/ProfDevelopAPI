@@ -32,6 +32,16 @@ public record UpdateUserRequest(
     bool IsActive
 );
 
+public record LookupItemDto(
+    int Id,
+    string Name
+);
+
+public record UserLookupsDto(
+    List<LookupItemDto> Departments,
+    List<LookupItemDto> Positions
+);
+
 public record AdminStatsDto(
     long? TotalEmployees,
     long? ActiveToday,

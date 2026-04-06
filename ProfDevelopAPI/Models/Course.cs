@@ -16,6 +16,16 @@ public partial class Course
 
     public string? CoverUrl { get; set; }
 
+    public string? ThemeColor { get; set; }
+
+    public string? IconKey { get; set; }
+
+    public string? Difficulty { get; set; }
+
+    public int EstimatedMinutes { get; set; }
+
+    public int OrderIndex { get; set; }
+
     public string? Category { get; set; }
 
     public bool IsPublished { get; set; }

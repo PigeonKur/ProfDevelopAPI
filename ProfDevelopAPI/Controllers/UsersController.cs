@@ -57,6 +57,11 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> Deactivate(int id)
         => await _users.DeactivateAsync(id) ? NoContent() : NotFound();
 
+    [HttpGet("lookups")]
+    [Authorize(Roles = "admin,hr")]
+    public async Task<IActionResult> Lookups()
+        => Ok(await _users.GetLookupsAsync());
+
     [HttpGet("admin-stats")]
     [Authorize(Roles = "admin,hr")]
     public async Task<IActionResult> AdminStats()

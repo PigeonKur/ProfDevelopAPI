@@ -14,7 +14,8 @@ public class CourseService : ICourseService
     {
         var courses = await _db.Courses
             .Include(c => c.Lessons)
-            .OrderBy(c => c.CreatedAt)
+            .OrderBy(c => c.OrderIndex)
+            .ThenBy(c => c.CreatedAt)
             .ToListAsync();
 
         return courses.Select(c => MapCourse(c)).ToList();
@@ -31,11 +32,19 @@ public class CourseService : ICourseService
 
     public async Task<CourseDto> CreateAsync(CreateCourseRequest request, int createdBy)
     {
+        var maxOrder = await _db.Courses.MaxAsync(c => (int?)c.OrderIndex) ?? 0;
+
         var course = new Course
         {
             Title = request.Title,
             Description = request.Description,
             Category = request.Category,
+            CoverUrl = request.CoverUrl,
+            ThemeColor = request.ThemeColor,
+            IconKey = request.IconKey,
+            Difficulty = request.Difficulty,
+            EstimatedMinutes = request.EstimatedMinutes,
+            OrderIndex = maxOrder + 1,
             IsPublished = request.IsPublished,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
@@ -57,6 +66,11 @@ public class CourseService : ICourseService
         course.Title = request.Title;
         course.Description = request.Description;
         course.Category = request.Category;
+        course.CoverUrl = request.CoverUrl;
+        course.ThemeColor = request.ThemeColor;
+        course.IconKey = request.IconKey;
+        course.Difficulty = request.Difficulty;
+        course.EstimatedMinutes = request.EstimatedMinutes;
         course.IsPublished = request.IsPublished;
         course.UpdatedAt = DateTime.UtcNow;
 
@@ -92,20 +106,17 @@ public class CourseService : ICourseService
         return lessons.Select((l, i) =>
         {
             var prog = progresses.FirstOrDefault(p => p.LessonId == l.Id);
-            var isUnlocked = i == 0
-                || progresses.Any(p => p.LessonId == lessons[i - 1].Id && p.IsCompleted);
+            var requiredLesson = l.RequiredLessonId.HasValue
+                ? lessons.FirstOrDefault(x => x.Id == l.RequiredLessonId.Value)
+                : null;
+            var isUnlocked = userId == null
+                || (l.RequiredLessonId.HasValue
+                    ? progresses.Any(p => p.LessonId == l.RequiredLessonId.Value && p.IsCompleted)
+                    : !l.IsLockedByDefault
+                      || i == 0
+                      || progresses.Any(p => p.LessonId == lessons[i - 1].Id && p.IsCompleted));
 
-            return new LessonDto(
-                l.Id,
-                l.Title,
-                l.OrderIndex,
-                l.XpReward,
-                l.Description,
-                prog?.IsCompleted ?? false,
-                isUnlocked,
-                prog?.Score,
-                prog?.MaxScore
-            );
+            return MapLesson(l, prog, isUnlocked, requiredLesson?.Title);
         }).ToList();
     }
 
@@ -122,17 +133,83 @@ public class CourseService : ICourseService
             OrderIndex = maxOrder + 1,
             XpReward = request.XpReward,
             Description = request.Description,
+            LessonType = request.LessonType,
+            EstimatedMinutes = request.EstimatedMinutes,
+            IsLockedByDefault = request.IsLockedByDefault,
+            RequiredLessonId = request.RequiredLessonId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
         _db.Lessons.Add(lesson);
         await _db.SaveChangesAsync();
 
-        return new LessonDto(
-            lesson.Id, lesson.Title,
-            lesson.OrderIndex, lesson.XpReward,
-            lesson.Description, false, false, null, null
-        );
+        return MapLesson(lesson, null, !lesson.IsLockedByDefault, null);
+    }
+
+    public async Task<LessonDto?> UpdateLessonAsync(int id, UpdateLessonRequest request)
+    {
+        var lesson = await _db.Lessons.FirstOrDefaultAsync(l => l.Id == id);
+        if (lesson == null) return null;
+
+        lesson.Title = request.Title;
+        lesson.XpReward = request.XpReward;
+        lesson.Description = request.Description;
+        lesson.LessonType = request.LessonType;
+        lesson.EstimatedMinutes = request.EstimatedMinutes;
+        lesson.IsLockedByDefault = request.IsLockedByDefault;
+        lesson.RequiredLessonId = request.RequiredLessonId;
+        lesson.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+
+        string? requiredLessonTitle = null;
+        if (lesson.RequiredLessonId.HasValue)
+        {
+            requiredLessonTitle = await _db.Lessons
+                .Where(l => l.Id == lesson.RequiredLessonId.Value)
+                .Select(l => l.Title)
+                .FirstOrDefaultAsync();
+        }
+
+        return MapLesson(lesson, null, !lesson.IsLockedByDefault, requiredLessonTitle);
+    }
+
+    public async Task<bool> ReorderLessonsAsync(int courseId, ReorderItemsRequest request)
+    {
+        var lessons = await _db.Lessons
+            .Where(l => l.CourseId == courseId)
+            .OrderBy(l => l.OrderIndex)
+            .ToListAsync();
+
+        if (lessons.Count == 0 || request.OrderedIds.Count != lessons.Count)
+            return false;
+
+        var lessonIds = lessons.Select(l => l.Id).OrderBy(id => id).ToList();
+        if (!lessonIds.SequenceEqual(request.OrderedIds.OrderBy(id => id)))
+            return false;
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+
+        // Break unique index conflicts while two lessons swap positions.
+        for (var i = 0; i < request.OrderedIds.Count; i++)
+        {
+            var lesson = lessons.First(l => l.Id == request.OrderedIds[i]);
+            lesson.OrderIndex = request.OrderedIds.Count + i + 1;
+            lesson.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync();
+
+        for (var i = 0; i < request.OrderedIds.Count; i++)
+        {
+            var lesson = lessons.First(l => l.Id == request.OrderedIds[i]);
+            lesson.OrderIndex = i + 1;
+            lesson.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return true;
     }
 
     public async Task<bool> DeleteLessonAsync(int id)
@@ -159,6 +236,10 @@ public class CourseService : ICourseService
             q.Type,
             q.Text,
             q.OrderIndex,
+            q.XpValue,
+            q.Hint,
+            q.ExplanationCorrect,
+            q.ExplanationWrong,
             q.Answers
                 .OrderBy(a => a.OrderIndex)
                 .Select(a => new AnswerDto(
@@ -187,6 +268,10 @@ public class CourseService : ICourseService
             Type = request.Type,
             Text = request.Text,
             OrderIndex = maxOrder + 1,
+            XpValue = request.XpValue,
+            Hint = request.Hint,
+            ExplanationCorrect = request.ExplanationCorrect,
+            ExplanationWrong = request.ExplanationWrong,
             CreatedAt = DateTime.UtcNow
         };
         _db.Questions.Add(question);
@@ -218,6 +303,7 @@ public class CourseService : ICourseService
 
         return new QuestionDto(
             question.Id, question.Type, question.Text, question.OrderIndex,
+            question.XpValue, question.Hint, question.ExplanationCorrect, question.ExplanationWrong,
             request.Answers.Select((a, i) =>
                 new AnswerDto(0, a.Text, a.IsCorrect, i + 1)).ToList(),
             request.MatchingPairs.Select((p, i) =>
@@ -236,6 +322,10 @@ public class CourseService : ICourseService
 
         question.Type = request.Type;
         question.Text = request.Text;
+        question.XpValue = request.XpValue;
+        question.Hint = request.Hint;
+        question.ExplanationCorrect = request.ExplanationCorrect;
+        question.ExplanationWrong = request.ExplanationWrong;
 
         _db.Answers.RemoveRange(question.Answers);
         _db.MatchingPairs.RemoveRange(question.MatchingPairs);
@@ -275,6 +365,10 @@ public class CourseService : ICourseService
             updated.Type,
             updated.Text,
             updated.OrderIndex,
+            updated.XpValue,
+            updated.Hint,
+            updated.ExplanationCorrect,
+            updated.ExplanationWrong,
             updated.Answers
                 .OrderBy(a => a.OrderIndex)
                 .Select(a => new AnswerDto(
@@ -291,6 +385,30 @@ public class CourseService : ICourseService
         );
     }
 
+    public async Task<bool> ReorderQuestionsAsync(int lessonId, ReorderItemsRequest request)
+    {
+        var questions = await _db.Questions
+            .Where(q => q.LessonId == lessonId)
+            .OrderBy(q => q.OrderIndex)
+            .ToListAsync();
+
+        if (questions.Count == 0 || request.OrderedIds.Count != questions.Count)
+            return false;
+
+        var questionIds = questions.Select(q => q.Id).OrderBy(id => id).ToList();
+        if (!questionIds.SequenceEqual(request.OrderedIds.OrderBy(id => id)))
+            return false;
+
+        for (var i = 0; i < request.OrderedIds.Count; i++)
+        {
+            var question = questions.First(q => q.Id == request.OrderedIds[i]);
+            question.OrderIndex = i + 1;
+        }
+
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
     public async Task<bool> DeleteQuestionAsync(int id)
     {
         var q = await _db.Questions.FindAsync(id);
@@ -301,9 +419,26 @@ public class CourseService : ICourseService
     }
 
     private static CourseDto MapCourse(Course c) => new(
-        c.Id, c.Title, c.Description, c.Category, c.CoverUrl,
+        c.Id, c.OrderIndex, c.Title, c.Description, c.Category, c.CoverUrl, c.ThemeColor, c.IconKey, c.Difficulty, c.EstimatedMinutes,
         c.IsPublished,
         c.Lessons.Count,
         null, null, null, null
+    );
+
+    private static LessonDto MapLesson(Lesson lesson, LessonProgress? progress, bool isUnlocked, string? requiredLessonTitle) => new(
+        lesson.Id,
+        lesson.Title,
+        lesson.OrderIndex,
+        lesson.XpReward,
+        lesson.Description,
+        lesson.LessonType,
+        lesson.EstimatedMinutes,
+        lesson.IsLockedByDefault,
+        lesson.RequiredLessonId,
+        requiredLessonTitle,
+        progress?.IsCompleted ?? false,
+        isUnlocked,
+        progress?.Score,
+        progress?.MaxScore
     );
 }

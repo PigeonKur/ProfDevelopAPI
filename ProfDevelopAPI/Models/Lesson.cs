@@ -20,6 +20,14 @@ public partial class Lesson
 
     public string? Description { get; set; }
 
+    public string LessonType { get; set; } = null!;
+
+    public int EstimatedMinutes { get; set; }
+
+    public bool IsLockedByDefault { get; set; }
+
+    public int? RequiredLessonId { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

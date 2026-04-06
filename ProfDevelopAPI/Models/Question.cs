@@ -18,6 +18,14 @@ public partial class Question
 
     public int OrderIndex { get; set; }
 
+    public int XpValue { get; set; }
+
+    public string? Hint { get; set; }
+
+    public string? ExplanationCorrect { get; set; }
+
+    public string? ExplanationWrong { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public virtual ICollection<Answer> Answers { get; set; } = new List<Answer>();

@@ -119,6 +119,15 @@ public partial class PostgresContext : DbContext
             entity.Property(e => e.CoverUrl)
                 .HasMaxLength(500)
                 .HasColumnName("cover_url");
+            entity.Property(e => e.Difficulty)
+                .HasMaxLength(30)
+                .HasColumnName("difficulty");
+            entity.Property(e => e.EstimatedMinutes)
+                .HasDefaultValue(0)
+                .HasColumnName("estimated_minutes");
+            entity.Property(e => e.IconKey)
+                .HasMaxLength(50)
+                .HasColumnName("icon_key");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnName("created_at");
@@ -127,6 +136,12 @@ public partial class PostgresContext : DbContext
             entity.Property(e => e.IsPublished)
                 .HasDefaultValue(false)
                 .HasColumnName("is_published");
+            entity.Property(e => e.OrderIndex)
+                .HasDefaultValue(1)
+                .HasColumnName("order_index");
+            entity.Property(e => e.ThemeColor)
+                .HasMaxLength(20)
+                .HasColumnName("theme_color");
             entity.Property(e => e.Title)
                 .HasMaxLength(200)
                 .HasColumnName("title");
@@ -213,9 +228,20 @@ public partial class PostgresContext : DbContext
                 .HasDefaultValueSql("now()")
                 .HasColumnName("created_at");
             entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.EstimatedMinutes)
+                .HasDefaultValue(5)
+                .HasColumnName("estimated_minutes");
+            entity.Property(e => e.IsLockedByDefault)
+                .HasDefaultValue(false)
+                .HasColumnName("is_locked_by_default");
+            entity.Property(e => e.LessonType)
+                .HasMaxLength(20)
+                .HasDefaultValue("quiz")
+                .HasColumnName("lesson_type");
             entity.Property(e => e.OrderIndex)
                 .HasDefaultValue(1)
                 .HasColumnName("order_index");
+            entity.Property(e => e.RequiredLessonId).HasColumnName("required_lesson_id");
             entity.Property(e => e.Title)
                 .HasMaxLength(200)
                 .HasColumnName("title");
@@ -346,10 +372,16 @@ public partial class PostgresContext : DbContext
             entity.Property(e => e.OrderIndex)
                 .HasDefaultValue(1)
                 .HasColumnName("order_index");
+            entity.Property(e => e.ExplanationCorrect).HasColumnName("explanation_correct");
+            entity.Property(e => e.ExplanationWrong).HasColumnName("explanation_wrong");
+            entity.Property(e => e.Hint).HasColumnName("hint");
             entity.Property(e => e.Text).HasColumnName("text");
             entity.Property(e => e.Type)
                 .HasMaxLength(20)
                 .HasColumnName("type");
+            entity.Property(e => e.XpValue)
+                .HasDefaultValue(10)
+                .HasColumnName("xp_value");
 
             entity.HasOne(d => d.Lesson).WithMany(p => p.Questions)
                 .HasForeignKey(d => d.LessonId)

@@ -9,6 +9,7 @@ public interface IUserService
     Task<UserListDto> CreateAsync(CreateUserRequest request);
     Task<UserListDto?> UpdateAsync(int id, UpdateUserRequest request);
     Task<bool> DeactivateAsync(int id);
+    Task<UserLookupsDto> GetLookupsAsync();
     Task<AdminStatsDto> GetAdminStatsAsync();
     Task<List<LeaderboardEntryDto>> GetLeaderboardAsync();
     Task<List<AchievementDto>> GetUserAchievementsAsync(int userId);

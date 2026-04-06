@@ -97,10 +97,15 @@ public class ProgressService : IProgressService
 
         return progresses.Select(p => new CourseDto(
             p.CourseId ?? 0,
+            0,
             p.CourseTitle ?? "",
             null,
             p.Category,
             null,
+            null,
+            null,
+            null,
+            0,
             true,
             (int)(p.TotalLessons ?? 0),
             (int)(p.CompletedLessons ?? 0),

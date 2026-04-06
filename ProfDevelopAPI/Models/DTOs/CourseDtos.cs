@@ -2,10 +2,15 @@ namespace ProfDevelopAPI.Models.DTOs;
 
 public record CourseDto(
     int Id,
+    int OrderIndex,
     string Title,
     string? Description,
     string? Category,
     string? CoverUrl,
+    string? ThemeColor,
+    string? IconKey,
+    string? Difficulty,
+    int EstimatedMinutes,
     bool IsPublished,
     int TotalLessons,
     int? CompletedLessons,
@@ -18,6 +23,11 @@ public record CreateCourseRequest(
     string Title,
     string? Description,
     string? Category,
+    string? CoverUrl,
+    string? ThemeColor,
+    string? IconKey,
+    string? Difficulty,
+    int EstimatedMinutes,
     bool IsPublished
 );
 
@@ -25,6 +35,11 @@ public record UpdateCourseRequest(
     string Title,
     string? Description,
     string? Category,
+    string? CoverUrl,
+    string? ThemeColor,
+    string? IconKey,
+    string? Difficulty,
+    int EstimatedMinutes,
     bool IsPublished
 );
 
@@ -34,6 +49,11 @@ public record LessonDto(
     int OrderIndex,
     int XpReward,
     string? Description,
+    string LessonType,
+    int EstimatedMinutes,
+    bool IsLockedByDefault,
+    int? RequiredLessonId,
+    string? RequiredLessonTitle,
     bool IsCompleted,
     bool IsUnlocked,
     int? Score,
@@ -44,13 +64,21 @@ public record CreateLessonRequest(
     int CourseId,
     string Title,
     int XpReward,
-    string? Description
+    string? Description,
+    string LessonType,
+    int EstimatedMinutes,
+    bool IsLockedByDefault,
+    int? RequiredLessonId
 );
 
 public record UpdateLessonRequest(
     string Title,
     int XpReward,
-    string? Description
+    string? Description,
+    string LessonType,
+    int EstimatedMinutes,
+    bool IsLockedByDefault,
+    int? RequiredLessonId
 );
 
 public record QuestionDto(
@@ -58,6 +86,10 @@ public record QuestionDto(
     string Type,
     string Text,
     int OrderIndex,
+    int XpValue,
+    string? Hint,
+    string? ExplanationCorrect,
+    string? ExplanationWrong,
     List<AnswerDto> Answers,
     List<MatchingPairDto> MatchingPairs
 );
@@ -80,6 +112,10 @@ public record CreateQuestionRequest(
     int LessonId,
     string Type,
     string Text,
+    int XpValue,
+    string? Hint,
+    string? ExplanationCorrect,
+    string? ExplanationWrong,
     List<CreateAnswerRequest> Answers,
     List<CreatePairRequest> MatchingPairs
 );
@@ -87,6 +123,10 @@ public record CreateQuestionRequest(
 public record UpdateQuestionRequest(
     string Type,
     string Text,
+    int XpValue,
+    string? Hint,
+    string? ExplanationCorrect,
+    string? ExplanationWrong,
     List<CreateAnswerRequest> Answers,
     List<CreatePairRequest> MatchingPairs
 );
@@ -99,4 +139,8 @@ public record CreateAnswerRequest(
 public record CreatePairRequest(
     string LeftText,
     string RightText
+);
+
+public record ReorderItemsRequest(
+    List<int> OrderedIds
 );

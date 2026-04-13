@@ -23,6 +23,24 @@ public record AchievementDto(
     DateTime? EarnedAt
 );
 
+public record AchievementCatalogDto(
+    int Id,
+    string Title,
+    string? Description,
+    string? Icon,
+    string ConditionKey,
+    int ConditionValue,
+    DateTime CreatedAt
+);
+
+public record CreateAchievementRequest(
+    string Title,
+    string? Description,
+    string? Icon,
+    string ConditionKey,
+    int ConditionValue
+);
+
 public record UserStatsDto(
     int TotalXp,
     int Level,

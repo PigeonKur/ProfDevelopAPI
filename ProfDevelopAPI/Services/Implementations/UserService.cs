@@ -140,6 +140,49 @@ public class UserService : IUserService
             .ToListAsync();
     }
 
+    public async Task<List<AchievementCatalogDto>> GetAchievementsAsync()
+    {
+        return await _db.Achievements
+            .OrderByDescending(a => a.CreatedAt)
+            .ThenBy(a => a.Title)
+            .Select(a => new AchievementCatalogDto(
+                a.Id,
+                a.Title,
+                a.Description,
+                a.Icon,
+                a.ConditionKey,
+                a.ConditionValue,
+                a.CreatedAt
+            ))
+            .ToListAsync();
+    }
+
+    public async Task<AchievementCatalogDto> CreateAchievementAsync(CreateAchievementRequest request)
+    {
+        var achievement = new Achievement
+        {
+            Title = request.Title.Trim(),
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            Icon = string.IsNullOrWhiteSpace(request.Icon) ? null : request.Icon.Trim(),
+            ConditionKey = request.ConditionKey.Trim(),
+            ConditionValue = request.ConditionValue,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Achievements.Add(achievement);
+        await _db.SaveChangesAsync();
+
+        return new AchievementCatalogDto(
+            achievement.Id,
+            achievement.Title,
+            achievement.Description,
+            achievement.Icon,
+            achievement.ConditionKey,
+            achievement.ConditionValue,
+            achievement.CreatedAt
+        );
+    }
+
     private static UserListDto MapUserList(VUserFull u) => new(
         u.Id ?? 0,
         u.FullName ?? "",

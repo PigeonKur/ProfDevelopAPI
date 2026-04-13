@@ -74,4 +74,14 @@ public class UsersController : ControllerBase
     [HttpGet("{id}/achievements")]
     public async Task<IActionResult> Achievements(int id)
         => Ok(await _users.GetUserAchievementsAsync(id));
+
+    [HttpGet("achievements/catalog")]
+    [Authorize(Roles = "admin,hr")]
+    public async Task<IActionResult> AchievementCatalog()
+        => Ok(await _users.GetAchievementsAsync());
+
+    [HttpPost("achievements")]
+    [Authorize(Roles = "admin,hr")]
+    public async Task<IActionResult> CreateAchievement([FromBody] CreateAchievementRequest request)
+        => Ok(await _users.CreateAchievementAsync(request));
 }

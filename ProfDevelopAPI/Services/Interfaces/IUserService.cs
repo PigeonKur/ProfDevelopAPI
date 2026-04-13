@@ -13,4 +13,6 @@ public interface IUserService
     Task<AdminStatsDto> GetAdminStatsAsync();
     Task<List<LeaderboardEntryDto>> GetLeaderboardAsync();
     Task<List<AchievementDto>> GetUserAchievementsAsync(int userId);
+    Task<List<AchievementCatalogDto>> GetAchievementsAsync();
+    Task<AchievementCatalogDto> CreateAchievementAsync(CreateAchievementRequest request);
 }

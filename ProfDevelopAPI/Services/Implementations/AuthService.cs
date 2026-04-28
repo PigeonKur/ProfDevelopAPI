@@ -131,6 +131,7 @@ public class AuthService : IAuthService
         u.UserStat?.TotalXp ?? 0,
         u.UserStat?.Level ?? 1,
         u.UserStat?.StreakDays ?? 0,
-        u.AvatarUrl
+        u.AvatarUrl,
+        u.UserStat?.LastActiveDate
     );
 }

@@ -17,6 +17,7 @@ public class ProgressService : IProgressService
 
         var passed = request.MaxScore > 0
                     && (request.Score * 100 / request.MaxScore) >= 70;
+        var perfect = request.MaxScore > 0 && request.Score == request.MaxScore;
         var xpEarned = passed ? lesson.XpReward : 0;
 
         var progress = await _db.LessonProgresses
@@ -60,8 +61,12 @@ public class ProgressService : IProgressService
             stats.Level = CalculateLevel(stats.TotalXp);
         }
 
+        var previousStreak = stats.StreakDays;
+        var streakIncreased = false;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (stats.LastActiveDate == null || stats.LastActiveDate < today)
+
+        // Серия растёт только за полностью правильно пройденный урок и не более раза в день.
+        if (perfect && (stats.LastActiveDate == null || stats.LastActiveDate < today))
         {
             var yesterday = today.AddDays(-1);
             stats.StreakDays = (stats.LastActiveDate == yesterday)
@@ -72,6 +77,7 @@ public class ProgressService : IProgressService
                 stats.MaxStreak = stats.StreakDays;
 
             stats.LastActiveDate = today;
+            streakIncreased = true;
         }
         stats.UpdatedAt = DateTime.UtcNow;
 
@@ -79,12 +85,17 @@ public class ProgressService : IProgressService
 
         var newAchievements = await CheckAchievementsAsync(userId, stats);
 
+        var streakActive = stats.LastActiveDate == today && stats.StreakDays > 0;
+
         return new SubmitProgressResponse(
             passed,
             xpEarned,
             stats.TotalXp,
             stats.Level,
             stats.StreakDays,
+            previousStreak,
+            streakIncreased,
+            streakActive,
             newAchievements
         );
     }
@@ -153,6 +164,9 @@ public class ProgressService : IProgressService
             submitResult.TotalXp,
             submitResult.NewLevel,
             submitResult.StreakDays,
+            submitResult.PreviousStreak,
+            submitResult.StreakIncreased,
+            submitResult.StreakActive,
             submitResult.NewAchievements,
             review
         );

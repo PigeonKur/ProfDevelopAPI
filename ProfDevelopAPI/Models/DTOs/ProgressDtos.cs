@@ -34,6 +34,9 @@ public record SubmitProgressResponse(
     int TotalXp,
     int NewLevel,
     int StreakDays,
+    int PreviousStreak,
+    bool StreakIncreased,
+    bool StreakActive,
     List<AchievementDto> NewAchievements
 );
 
@@ -45,6 +48,9 @@ public record LessonAttemptResultDto(
     int TotalXp,
     int NewLevel,
     int StreakDays,
+    int PreviousStreak,
+    bool StreakIncreased,
+    bool StreakActive,
     List<AchievementDto> NewAchievements,
     List<QuestionReviewDto> Questions
 );

@@ -89,6 +89,75 @@ public class ProgressService : IProgressService
         );
     }
 
+    public async Task<QuestionCheckResultDto> CheckQuestionAsync(QuestionCheckRequest request)
+    {
+        var question = await _db.Questions
+            .Include(q => q.Answers)
+            .Include(q => q.MatchingPairs)
+            .FirstOrDefaultAsync(q => q.Id == request.QuestionId)
+            ?? throw new KeyNotFoundException("Вопрос не найден");
+
+        return EvaluateQuestion(
+            question,
+            new QuestionAttemptDto(
+                request.QuestionId,
+                request.SelectedAnswerIds,
+                request.MatchingPairs
+            )
+        );
+    }
+
+    public async Task<LessonAttemptResultDto> SubmitLessonAttemptAsync(int userId, LessonAttemptRequest request)
+    {
+        var lesson = await _db.Lessons
+            .Include(l => l.Questions)
+                .ThenInclude(q => q.Answers)
+            .Include(l => l.Questions)
+                .ThenInclude(q => q.MatchingPairs)
+            .FirstOrDefaultAsync(l => l.Id == request.LessonId)
+            ?? throw new KeyNotFoundException("Урок не найден");
+
+        var review = new List<QuestionReviewDto>();
+        var score = 0;
+        var maxScore = lesson.Questions.Count;
+
+        foreach (var question in lesson.Questions.OrderBy(q => q.OrderIndex))
+        {
+            var answer = request.Answers.FirstOrDefault(x => x.QuestionId == question.Id)
+                ?? new QuestionAttemptDto(question.Id, null, null);
+
+            var evaluation = EvaluateQuestion(question, answer);
+            if (evaluation.IsCorrect)
+                score++;
+
+            review.Add(new QuestionReviewDto(
+                evaluation.QuestionId,
+                evaluation.IsCorrect,
+                evaluation.Explanation,
+                evaluation.CorrectAnswerIds,
+                evaluation.CorrectMatchingPairs
+            ));
+        }
+
+        var submitResult = await SubmitAsync(userId, new SubmitProgressRequest(
+            request.LessonId,
+            score,
+            maxScore
+        ));
+
+        return new LessonAttemptResultDto(
+            submitResult.IsCompleted,
+            score,
+            maxScore,
+            submitResult.XpEarned,
+            submitResult.TotalXp,
+            submitResult.NewLevel,
+            submitResult.StreakDays,
+            submitResult.NewAchievements,
+            review
+        );
+    }
+
     public async Task<List<CourseDto>> GetUserCoursesAsync(int userId)
     {
         var progresses = await _db.VCourseProgresses
@@ -137,6 +206,53 @@ public class ProgressService : IProgressService
 
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    private static QuestionCheckResultDto EvaluateQuestion(Question question, QuestionAttemptDto answer)
+    {
+        var isCorrect = false;
+        var correctAnswerIds = new List<int>();
+        var correctMatchingPairs = new List<MatchingAttemptDto>();
+
+        switch (question.Type)
+        {
+            case "choice":
+            case "truefalse":
+            {
+                var selectedIds = answer.SelectedAnswerIds?
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToList() ?? [];
+                correctAnswerIds = question.Answers
+                    .Where(a => a.IsCorrect)
+                    .Select(a => a.Id)
+                    .OrderBy(x => x)
+                    .ToList();
+                isCorrect = selectedIds.SequenceEqual(correctAnswerIds);
+                break;
+            }
+            case "matching":
+            {
+                var submittedPairs = answer.MatchingPairs?
+                    .OrderBy(x => x.LeftPairId)
+                    .ToList() ?? [];
+                correctMatchingPairs = question.MatchingPairs
+                    .OrderBy(x => x.OrderIndex)
+                    .Select(x => new MatchingAttemptDto(x.Id, x.Id))
+                    .ToList();
+                isCorrect = submittedPairs.Count == correctMatchingPairs.Count
+                    && !submittedPairs.Except(correctMatchingPairs).Any();
+                break;
+            }
+        }
+
+        return new QuestionCheckResultDto(
+            question.Id,
+            isCorrect,
+            isCorrect ? question.ExplanationCorrect : question.ExplanationWrong,
+            correctAnswerIds,
+            correctMatchingPairs
+        );
     }
 
     private static int CalculateLevel(int xp) => xp / 100 + 1;

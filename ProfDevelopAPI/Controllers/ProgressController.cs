@@ -31,6 +31,34 @@ public class ProgressController : ControllerBase
         }
     }
 
+    [HttpPost("attempt")]
+    public async Task<IActionResult> SubmitAttempt([FromBody] LessonAttemptRequest request)
+    {
+        try
+        {
+            var result = await _progress.SubmitLessonAttemptAsync(CurrentUserId, request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("question-check")]
+    public async Task<IActionResult> CheckQuestion([FromBody] QuestionCheckRequest request)
+    {
+        try
+        {
+            var result = await _progress.CheckQuestionAsync(request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("my-courses")]
     public async Task<IActionResult> MyCourses()
         => Ok(await _progress.GetUserCoursesAsync(CurrentUserId));

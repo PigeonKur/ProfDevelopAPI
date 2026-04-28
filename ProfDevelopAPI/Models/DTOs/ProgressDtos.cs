@@ -6,6 +6,28 @@ public record SubmitProgressRequest(
     int MaxScore
 );
 
+public record LessonAttemptRequest(
+    int LessonId,
+    List<QuestionAttemptDto> Answers
+);
+
+public record QuestionAttemptDto(
+    int QuestionId,
+    List<int>? SelectedAnswerIds,
+    List<MatchingAttemptDto>? MatchingPairs
+);
+
+public record QuestionCheckRequest(
+    int QuestionId,
+    List<int>? SelectedAnswerIds,
+    List<MatchingAttemptDto>? MatchingPairs
+);
+
+public record MatchingAttemptDto(
+    int LeftPairId,
+    int RightPairId
+);
+
 public record SubmitProgressResponse(
     bool IsCompleted,
     int XpEarned,
@@ -13,6 +35,34 @@ public record SubmitProgressResponse(
     int NewLevel,
     int StreakDays,
     List<AchievementDto> NewAchievements
+);
+
+public record LessonAttemptResultDto(
+    bool IsCompleted,
+    int Score,
+    int MaxScore,
+    int XpEarned,
+    int TotalXp,
+    int NewLevel,
+    int StreakDays,
+    List<AchievementDto> NewAchievements,
+    List<QuestionReviewDto> Questions
+);
+
+public record QuestionReviewDto(
+    int QuestionId,
+    bool IsCorrect,
+    string? Explanation,
+    List<int> CorrectAnswerIds,
+    List<MatchingAttemptDto> CorrectMatchingPairs
+);
+
+public record QuestionCheckResultDto(
+    int QuestionId,
+    bool IsCorrect,
+    string? Explanation,
+    List<int> CorrectAnswerIds,
+    List<MatchingAttemptDto> CorrectMatchingPairs
 );
 
 public record AchievementDto(

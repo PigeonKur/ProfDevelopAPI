@@ -162,11 +162,15 @@ public class UserService : IUserService
             .CountAsync(p => p.UserId == userId && p.IsCompleted);
         var coursesDone = await _db.VCourseProgresses
             .CountAsync(p => p.UserId == userId && p.ProgressPct == 100);
-        var avgScore = (int)Math.Round(await _db.LessonProgresses
+        // EF Core не транслирует Select+DefaultIfEmpty+AverageAsync — считаем
+        // среднее на клиенте после простого SELECT (Score, MaxScore).
+        var attempts = await _db.LessonProgresses
             .Where(p => p.UserId == userId && p.MaxScore > 0)
-            .Select(p => (double)p.Score / p.MaxScore * 100.0)
-            .DefaultIfEmpty(0)
-            .AverageAsync());
+            .Select(p => new { p.Score, p.MaxScore })
+            .ToListAsync();
+        var avgScore = attempts.Count == 0
+            ? 0
+            : (int)Math.Round(attempts.Average(a => (double)a.Score / a.MaxScore * 100.0));
 
         return allAchievements.Select(ach =>
         {

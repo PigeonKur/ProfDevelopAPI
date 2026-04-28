@@ -70,7 +70,10 @@ public record AchievementDto(
     string Title,
     string? Description,
     string? Icon,
-    DateTime? EarnedAt
+    DateTime? EarnedAt,
+    string? ConditionKey = null,
+    int? ConditionValue = null,
+    int? CurrentValue = null
 );
 
 public record AchievementCatalogDto(

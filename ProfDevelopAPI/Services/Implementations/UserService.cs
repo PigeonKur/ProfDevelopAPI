@@ -125,19 +125,74 @@ public class UserService : IUserService
         )).ToList();
     }
 
-    public async Task<List<AchievementDto>> GetUserAchievementsAsync(int userId)
+    public async Task<List<AchievementDto>> GetUserAchievementsAsync(int userId, bool includeUnearned = false)
     {
-        return await _db.UserAchievements
-            .Include(ua => ua.Achievement)
+        var earnedMap = await _db.UserAchievements
             .Where(ua => ua.UserId == userId)
-            .Select(ua => new AchievementDto(
-                ua.Achievement.Id,
-                ua.Achievement.Title,
-                ua.Achievement.Description,
-                ua.Achievement.Icon,
-                ua.EarnedAt
-            ))
+            .ToDictionaryAsync(ua => ua.AchievementId, ua => (DateTime?)ua.EarnedAt);
+
+        // Без includeUnearned — старое поведение: только полученные, без новых полей.
+        // Так не сломаем десктопную админку, которая ожидает плоский список «получено».
+        if (!includeUnearned)
+        {
+            return await _db.UserAchievements
+                .Include(ua => ua.Achievement)
+                .Where(ua => ua.UserId == userId)
+                .Select(ua => new AchievementDto(
+                    ua.Achievement.Id,
+                    ua.Achievement.Title,
+                    ua.Achievement.Description,
+                    ua.Achievement.Icon,
+                    ua.EarnedAt,
+                    ua.Achievement.ConditionKey,
+                    ua.Achievement.ConditionValue,
+                    ua.Achievement.ConditionValue
+                ))
+                .ToListAsync();
+        }
+
+        // С includeUnearned (для мобилки) — все ачивки + текущий прогресс.
+        var allAchievements = await _db.Achievements
+            .OrderBy(a => a.ConditionValue)
+            .ThenBy(a => a.Title)
             .ToListAsync();
+
+        var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
+        var lessonsDone = await _db.LessonProgresses
+            .CountAsync(p => p.UserId == userId && p.IsCompleted);
+        var coursesDone = await _db.VCourseProgresses
+            .CountAsync(p => p.UserId == userId && p.ProgressPct == 100);
+        var avgScore = (int)Math.Round(await _db.LessonProgresses
+            .Where(p => p.UserId == userId && p.MaxScore > 0)
+            .Select(p => (double)p.Score / p.MaxScore * 100.0)
+            .DefaultIfEmpty(0)
+            .AverageAsync());
+
+        return allAchievements.Select(ach =>
+        {
+            int? current = ach.ConditionKey switch
+            {
+                "lessons_done" => lessonsDone,
+                "streak_days" => stats?.StreakDays ?? 0,
+                "total_xp" => stats?.TotalXp ?? 0,
+                "courses_done" => coursesDone,
+                "avg_score" => avgScore,
+                _ => null
+            };
+
+            earnedMap.TryGetValue(ach.Id, out var earnedAt);
+
+            return new AchievementDto(
+                ach.Id,
+                ach.Title,
+                ach.Description,
+                ach.Icon,
+                earnedAt,
+                ach.ConditionKey,
+                ach.ConditionValue,
+                current
+            );
+        }).ToList();
     }
 
     public async Task<List<AchievementCatalogDto>> GetAchievementsAsync()

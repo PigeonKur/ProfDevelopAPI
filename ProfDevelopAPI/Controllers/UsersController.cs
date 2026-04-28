@@ -72,8 +72,8 @@ public class UsersController : ControllerBase
         => Ok(await _users.GetLeaderboardAsync());
 
     [HttpGet("{id}/achievements")]
-    public async Task<IActionResult> Achievements(int id)
-        => Ok(await _users.GetUserAchievementsAsync(id));
+    public async Task<IActionResult> Achievements(int id, [FromQuery] bool includeUnearned = false)
+        => Ok(await _users.GetUserAchievementsAsync(id, includeUnearned));
 
     [HttpGet("achievements/catalog")]
     [Authorize(Roles = "admin,hr")]

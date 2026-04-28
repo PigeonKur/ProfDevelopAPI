@@ -63,6 +63,10 @@ public class ProgressController : ControllerBase
     public async Task<IActionResult> MyCourses()
         => Ok(await _progress.GetUserCoursesAsync(CurrentUserId));
 
+    [HttpGet("practice-questions")]
+    public async Task<IActionResult> PracticeQuestions([FromQuery] int limit = 12)
+        => Ok(await _progress.GetPracticeQuestionsAsync(CurrentUserId, limit));
+
     [HttpGet("users/{userId:int}/courses")]
     [Authorize(Roles = "admin,hr")]
     public async Task<IActionResult> UserCourses(int userId)

@@ -208,6 +208,46 @@ public class ProgressService : IProgressService
         return true;
     }
 
+    public async Task<List<QuestionDto>> GetPracticeQuestionsAsync(int userId, int limit)
+    {
+        // Берём все ID уроков, которые пользователь уже завершил.
+        var completedLessonIds = await _db.LessonProgresses
+            .Where(p => p.UserId == userId && p.IsCompleted)
+            .Select(p => p.LessonId)
+            .ToListAsync();
+
+        if (completedLessonIds.Count == 0) return new List<QuestionDto>();
+
+        var questions = await _db.Questions
+            .Include(q => q.Answers)
+            .Include(q => q.MatchingPairs)
+            .AsSplitQuery()
+            .Where(q => completedLessonIds.Contains(q.LessonId))
+            .ToListAsync();
+
+        var rng = new Random();
+        var shuffled = questions.OrderBy(_ => rng.Next()).Take(limit > 0 ? limit : questions.Count);
+
+        return shuffled.Select(q => new QuestionDto(
+            q.Id,
+            q.Type,
+            q.Text,
+            q.OrderIndex,
+            q.XpValue,
+            q.Hint,
+            q.ExplanationCorrect,
+            q.ExplanationWrong,
+            q.Answers
+                .OrderBy(a => a.OrderIndex)
+                .Select(a => new AnswerDto(a.Id, a.Text, false, a.OrderIndex))
+                .ToList(),
+            q.MatchingPairs
+                .OrderBy(m => m.OrderIndex)
+                .Select(m => new MatchingPairDto(m.Id, m.LeftText, m.RightText, m.OrderIndex))
+                .ToList()
+        )).ToList();
+    }
+
     private static QuestionCheckResultDto EvaluateQuestion(Question question, QuestionAttemptDto answer)
     {
         var isCorrect = false;

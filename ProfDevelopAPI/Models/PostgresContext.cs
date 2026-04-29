@@ -35,6 +35,8 @@ public partial class PostgresContext : DbContext
 
     public virtual DbSet<Question> Questions { get; set; }
 
+    public virtual DbSet<QuestionAttempt> QuestionAttempts { get; set; }
+
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
@@ -504,6 +506,20 @@ public partial class PostgresContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.UserAchievements)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("user_achievements_user_id_fkey");
+        });
+
+        modelBuilder.Entity<QuestionAttempt>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.QuestionId }).HasName("question_attempts_pkey");
+
+            entity.ToTable("question_attempts", "profDevelop");
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.QuestionId).HasColumnName("question_id");
+            entity.Property(e => e.IsCorrect).HasColumnName("is_correct");
+            entity.Property(e => e.LastAttemptAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("last_attempt_at");
         });
 
         modelBuilder.Entity<UserStat>(entity =>

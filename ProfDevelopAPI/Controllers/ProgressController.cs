@@ -50,7 +50,7 @@ public class ProgressController : ControllerBase
     {
         try
         {
-            var result = await _progress.CheckQuestionAsync(request);
+            var result = await _progress.CheckQuestionAsync(CurrentUserId, request);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)

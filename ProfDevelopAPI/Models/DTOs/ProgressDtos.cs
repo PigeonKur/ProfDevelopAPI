@@ -125,7 +125,10 @@ public record AssignCourseRequest(
 public record XpBoostStatusDto(
     bool IsActive,
     DateTime? ActiveUntil,
-    int RemainingSeconds
+    int RemainingSeconds,
+    int LessonsToday = 0,
+    int XpToday = 0,
+    bool IsEligible = false
 );
 
 public record ActivateBoostRequest(

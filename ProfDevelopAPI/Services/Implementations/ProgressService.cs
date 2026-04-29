@@ -97,7 +97,10 @@ public class ProgressService : IProgressService
         );
     }
 
-    public async Task<QuestionCheckResultDto> CheckQuestionAsync(QuestionCheckRequest request)
+    public Task<QuestionCheckResultDto> CheckQuestionAsync(QuestionCheckRequest request)
+        => CheckQuestionAsync(0, request);
+
+    public async Task<QuestionCheckResultDto> CheckQuestionAsync(int userId, QuestionCheckRequest request)
     {
         var question = await _db.Questions
             .Include(q => q.Answers)
@@ -105,7 +108,7 @@ public class ProgressService : IProgressService
             .FirstOrDefaultAsync(q => q.Id == request.QuestionId)
             ?? throw new KeyNotFoundException("Вопрос не найден");
 
-        return EvaluateQuestion(
+        var result = EvaluateQuestion(
             question,
             new QuestionAttemptDto(
                 request.QuestionId,
@@ -113,6 +116,31 @@ public class ProgressService : IProgressService
                 request.MatchingPairs
             )
         );
+
+        if (userId > 0)
+        {
+            var attempt = await _db.QuestionAttempts
+                .FirstOrDefaultAsync(qa => qa.UserId == userId && qa.QuestionId == request.QuestionId);
+            var nowUtc = DateTime.UtcNow;
+            if (attempt == null)
+            {
+                _db.QuestionAttempts.Add(new QuestionAttempt
+                {
+                    UserId = userId,
+                    QuestionId = request.QuestionId,
+                    IsCorrect = result.IsCorrect,
+                    LastAttemptAt = nowUtc
+                });
+            }
+            else
+            {
+                attempt.IsCorrect = result.IsCorrect;
+                attempt.LastAttemptAt = nowUtc;
+            }
+            await _db.SaveChangesAsync();
+        }
+
+        return result;
     }
 
     public async Task<LessonAttemptResultDto> SubmitLessonAttemptAsync(int userId, LessonAttemptRequest request)
@@ -129,6 +157,12 @@ public class ProgressService : IProgressService
         var score = 0;
         var maxScore = lesson.Questions.Count;
 
+        var questionIds = lesson.Questions.Select(q => q.Id).ToList();
+        var existingAttempts = await _db.QuestionAttempts
+            .Where(qa => qa.UserId == userId && questionIds.Contains(qa.QuestionId))
+            .ToDictionaryAsync(qa => qa.QuestionId);
+
+        var nowUtc = DateTime.UtcNow;
         foreach (var question in lesson.Questions.OrderBy(q => q.OrderIndex))
         {
             var answer = request.Answers.FirstOrDefault(x => x.QuestionId == question.Id)
@@ -138,6 +172,22 @@ public class ProgressService : IProgressService
             if (evaluation.IsCorrect)
                 score++;
 
+            if (existingAttempts.TryGetValue(question.Id, out var attempt))
+            {
+                attempt.IsCorrect = evaluation.IsCorrect;
+                attempt.LastAttemptAt = nowUtc;
+            }
+            else
+            {
+                _db.QuestionAttempts.Add(new QuestionAttempt
+                {
+                    UserId = userId,
+                    QuestionId = question.Id,
+                    IsCorrect = evaluation.IsCorrect,
+                    LastAttemptAt = nowUtc
+                });
+            }
+
             review.Add(new QuestionReviewDto(
                 evaluation.QuestionId,
                 evaluation.IsCorrect,
@@ -146,6 +196,7 @@ public class ProgressService : IProgressService
                 evaluation.CorrectMatchingPairs
             ));
         }
+        await _db.SaveChangesAsync();
 
         var submitResult = await SubmitAsync(userId, new SubmitProgressRequest(
             request.LessonId,
@@ -226,12 +277,17 @@ public class ProgressService : IProgressService
             _db.UserStats.Add(stats);
         }
         var now = DateTime.UtcNow;
-        // Если буст ещё активен — продлеваем от его конца, иначе — от now.
-        var baseTime = stats.BoostActiveUntil is { } until && until > now ? until : now;
-        stats.BoostActiveUntil = baseTime.AddMinutes(minutes);
+        var (lessonsToday, xpToday) = await GetTodayProgressAsync(userId);
+        var eligible = lessonsToday >= BoostMinLessons || xpToday >= BoostMinXp;
+        if (!eligible)
+        {
+            return BuildBoostStatus(stats.BoostActiveUntil, lessonsToday, xpToday);
+        }
+        // Каждая активация — фиксированное окно от текущего момента, не накопительно.
+        stats.BoostActiveUntil = now.AddMinutes(minutes);
         stats.UpdatedAt = now;
         await _db.SaveChangesAsync();
-        return BuildBoostStatus(stats.BoostActiveUntil);
+        return BuildBoostStatus(stats.BoostActiveUntil, lessonsToday, xpToday);
     }
 
     public async Task<XpBoostStatusDto> GetXpBoostStatusAsync(int userId)
@@ -240,16 +296,31 @@ public class ProgressService : IProgressService
             .Where(s => s.UserId == userId)
             .Select(s => s.BoostActiveUntil)
             .FirstOrDefaultAsync();
-        return BuildBoostStatus(until);
+        var (lessonsToday, xpToday) = await GetTodayProgressAsync(userId);
+        return BuildBoostStatus(until, lessonsToday, xpToday);
     }
 
-    private static XpBoostStatusDto BuildBoostStatus(DateTime? until)
+    private const int BoostMinLessons = 3;
+    private const int BoostMinXp = 60;
+
+    private async Task<(int lessons, int xp)> GetTodayProgressAsync(int userId)
     {
+        var todayStart = DateTime.UtcNow.Date;
+        var rows = await _db.LessonProgresses
+            .Where(p => p.UserId == userId && p.CompletedAt != null && p.CompletedAt >= todayStart)
+            .Select(p => new { p.XpEarned })
+            .ToListAsync();
+        return (rows.Count, rows.Sum(x => x.XpEarned));
+    }
+
+    private static XpBoostStatusDto BuildBoostStatus(DateTime? until, int lessonsToday = 0, int xpToday = 0)
+    {
+        var eligible = lessonsToday >= BoostMinLessons || xpToday >= BoostMinXp;
         var now = DateTime.UtcNow;
         if (until is null || until <= now)
-            return new XpBoostStatusDto(false, null, 0);
+            return new XpBoostStatusDto(false, null, 0, lessonsToday, xpToday, eligible);
         var remaining = (int)Math.Round((until.Value - now).TotalSeconds);
-        return new XpBoostStatusDto(true, until, Math.Max(remaining, 0));
+        return new XpBoostStatusDto(true, until, Math.Max(remaining, 0), lessonsToday, xpToday, eligible);
     }
 
     public async Task<List<QuestionDto>> GetPracticeQuestionsAsync(int userId, int limit)
@@ -279,11 +350,18 @@ public class ProgressService : IProgressService
 
         var completedLessonIds = weaknessByLesson.Keys.ToList();
 
+        // Исключаем вопросы, на которые пользователь уже ответил правильно
+        // в последнюю попытку (на уровне урока или практики).
+        var correctlyAnsweredIds = await _db.QuestionAttempts
+            .Where(qa => qa.UserId == userId && qa.IsCorrect)
+            .Select(qa => qa.QuestionId)
+            .ToListAsync();
+
         var questions = await _db.Questions
             .Include(q => q.Answers)
             .Include(q => q.MatchingPairs)
             .AsSplitQuery()
-            .Where(q => completedLessonIds.Contains(q.LessonId))
+            .Where(q => completedLessonIds.Contains(q.LessonId) && !correctlyAnsweredIds.Contains(q.Id))
             .ToListAsync();
 
         var rng = new Random();

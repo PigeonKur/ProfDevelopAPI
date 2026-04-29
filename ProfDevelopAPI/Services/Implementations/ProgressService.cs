@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using ProfDevelopAPI.Models;
 using ProfDevelopAPI.Models.DTOs;
 using ProfDevelopAPI.Services.Interfaces;
@@ -13,13 +13,13 @@ public class ProgressService : IProgressService
     public async Task<SubmitProgressResponse> SubmitAsync(int userId, SubmitProgressRequest request)
     {
         var lesson = await _db.Lessons.FindAsync(request.LessonId)
-            ?? throw new KeyNotFoundException("Урок не найден");
+            ?? throw new KeyNotFoundException("РЈСЂРѕРє РЅРµ РЅР°Р№РґРµРЅ");
 
         var passed = request.MaxScore > 0
                     && (request.Score * 100 / request.MaxScore) >= 70;
         var xpEarned = passed ? lesson.XpReward : 0;
 
-        // 2x XP boost: если у пользователя активен буст, удваиваем награду.
+        // 2x XP boost: РµСЃР»Рё Сѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р°РєС‚РёРІРµРЅ Р±СѓСЃС‚, СѓРґРІР°РёРІР°РµРј РЅР°РіСЂР°РґСѓ.
         var preBoostStats = await _db.UserStats.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == userId);
         var boostActive = preBoostStats?.BoostActiveUntil is { } until && until > DateTime.UtcNow;
         if (boostActive && xpEarned > 0)
@@ -106,7 +106,7 @@ public class ProgressService : IProgressService
             .Include(q => q.Answers)
             .Include(q => q.MatchingPairs)
             .FirstOrDefaultAsync(q => q.Id == request.QuestionId)
-            ?? throw new KeyNotFoundException("Вопрос не найден");
+            ?? throw new KeyNotFoundException("Р’РѕРїСЂРѕСЃ РЅРµ РЅР°Р№РґРµРЅ");
 
         var result = EvaluateQuestion(
             question,
@@ -151,7 +151,7 @@ public class ProgressService : IProgressService
             .Include(l => l.Questions)
                 .ThenInclude(q => q.MatchingPairs)
             .FirstOrDefaultAsync(l => l.Id == request.LessonId)
-            ?? throw new KeyNotFoundException("Урок не найден");
+            ?? throw new KeyNotFoundException("РЈСЂРѕРє РЅРµ РЅР°Р№РґРµРЅ");
 
         var review = new List<QuestionReviewDto>();
         var score = 0;
@@ -283,7 +283,7 @@ public class ProgressService : IProgressService
         {
             return BuildBoostStatus(stats.BoostActiveUntil, lessonsToday, xpToday);
         }
-        // Каждая активация — фиксированное окно от текущего момента, не накопительно.
+        // РљР°Р¶РґР°СЏ Р°РєС‚РёРІР°С†РёСЏ вЂ” С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕРµ РѕРєРЅРѕ РѕС‚ С‚РµРєСѓС‰РµРіРѕ РјРѕРјРµРЅС‚Р°, РЅРµ РЅР°РєРѕРїРёС‚РµР»СЊРЅРѕ.
         stats.BoostActiveUntil = now.AddMinutes(minutes);
         stats.UpdatedAt = now;
         await _db.SaveChangesAsync();
@@ -301,6 +301,7 @@ public class ProgressService : IProgressService
     }
 
     private const int BoostMinLessons = 3;
+
     private const int BoostMinXp = 60;
 
     private async Task<(int lessons, int xp)> GetTodayProgressAsync(int userId)
@@ -325,8 +326,8 @@ public class ProgressService : IProgressService
 
     public async Task<List<QuestionDto>> GetPracticeQuestionsAsync(int userId, int limit)
     {
-        // Берём все ID уроков, которые пользователь уже завершил, плюс его
-        // прогресс по ним (для оценки «слабости»).
+        // Р‘РµСЂС‘Рј РІСЃРµ ID СѓСЂРѕРєРѕРІ, РєРѕС‚РѕСЂС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ СѓР¶Рµ Р·Р°РІРµСЂС€РёР», РїР»СЋСЃ РµРіРѕ
+        // РїСЂРѕРіСЂРµСЃСЃ РїРѕ РЅРёРј (РґР»СЏ РѕС†РµРЅРєРё В«СЃР»Р°Р±РѕСЃС‚РёВ»).
         var lessonProgresses = await _db.LessonProgresses
             .Where(p => p.UserId == userId && p.IsCompleted)
             .Select(p => new { p.LessonId, p.Score, p.MaxScore })
@@ -334,8 +335,8 @@ public class ProgressService : IProgressService
 
         if (lessonProgresses.Count == 0) return new List<QuestionDto>();
 
-        // weakness = 1 - score/maxScore. Чем хуже сдан урок, тем выше приоритет
-        // его вопросов в практике.
+        // weakness = 1 - score/maxScore. Р§РµРј С…СѓР¶Рµ СЃРґР°РЅ СѓСЂРѕРє, С‚РµРј РІС‹С€Рµ РїСЂРёРѕСЂРёС‚РµС‚
+        // РµРіРѕ РІРѕРїСЂРѕСЃРѕРІ РІ РїСЂР°РєС‚РёРєРµ.
         var weaknessByLesson = lessonProgresses
             .GroupBy(p => p.LessonId)
             .ToDictionary(
@@ -350,8 +351,8 @@ public class ProgressService : IProgressService
 
         var completedLessonIds = weaknessByLesson.Keys.ToList();
 
-        // Исключаем вопросы, на которые пользователь уже ответил правильно
-        // в последнюю попытку (на уровне урока или практики).
+        // РСЃРєР»СЋС‡Р°РµРј РІРѕРїСЂРѕСЃС‹, РЅР° РєРѕС‚РѕСЂС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ СѓР¶Рµ РѕС‚РІРµС‚РёР» РїСЂР°РІРёР»СЊРЅРѕ
+        // РІ РїРѕСЃР»РµРґРЅСЋСЋ РїРѕРїС‹С‚РєСѓ (РЅР° СѓСЂРѕРІРЅРµ СѓСЂРѕРєР° РёР»Рё РїСЂР°РєС‚РёРєРё).
         var correctlyAnsweredIds = await _db.QuestionAttempts
             .Where(qa => qa.UserId == userId && qa.IsCorrect)
             .Select(qa => qa.QuestionId)
@@ -461,7 +462,7 @@ public class ProgressService : IProgressService
         var coursesCount = await _db.VCourseProgresses
             .CountAsync(p => p.UserId == userId && p.ProgressPct == 100);
 
-        // avg_score считаем на клиенте (EF не транслирует выражение со Score/MaxScore).
+        // avg_score СЃС‡РёС‚Р°РµРј РЅР° РєР»РёРµРЅС‚Рµ (EF РЅРµ С‚СЂР°РЅСЃР»РёСЂСѓРµС‚ РІС‹СЂР°Р¶РµРЅРёРµ СЃРѕ Score/MaxScore).
         var attempts = await _db.LessonProgresses
             .Where(p => p.UserId == userId && p.MaxScore > 0)
             .Select(p => new { p.Score, p.MaxScore })
@@ -503,3 +504,6 @@ public class ProgressService : IProgressService
         return newAchievements;
     }
 }
+
+
+

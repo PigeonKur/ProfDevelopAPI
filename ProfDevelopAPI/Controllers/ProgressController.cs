@@ -67,6 +67,18 @@ public class ProgressController : ControllerBase
     public async Task<IActionResult> PracticeQuestions([FromQuery] int limit = 12)
         => Ok(await _progress.GetPracticeQuestionsAsync(CurrentUserId, limit));
 
+    [HttpGet("xp-boost")]
+    public async Task<IActionResult> XpBoostStatus()
+        => Ok(await _progress.GetXpBoostStatusAsync(CurrentUserId));
+
+    [HttpPost("activate-boost")]
+    public async Task<IActionResult> ActivateBoost([FromBody] ActivateBoostRequest? request)
+    {
+        var minutes = request?.DurationMinutes ?? 30;
+        var status = await _progress.ActivateXpBoostAsync(CurrentUserId, minutes);
+        return Ok(status);
+    }
+
     [HttpGet("users/{userId:int}/courses")]
     [Authorize(Roles = "admin,hr")]
     public async Task<IActionResult> UserCourses(int userId)

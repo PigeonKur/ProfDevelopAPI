@@ -68,8 +68,8 @@ public class UsersController : ControllerBase
         => Ok(await _users.GetAdminStatsAsync());
 
     [HttpGet("leaderboard")]
-    public async Task<IActionResult> Leaderboard()
-        => Ok(await _users.GetLeaderboardAsync());
+    public async Task<IActionResult> Leaderboard([FromQuery] string? tier = null)
+        => Ok(await _users.GetLeaderboardAsync(tier));
 
     [HttpGet("{id}/achievements")]
     public async Task<IActionResult> Achievements(int id, [FromQuery] bool includeUnearned = false)

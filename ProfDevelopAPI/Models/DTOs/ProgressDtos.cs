@@ -110,7 +110,9 @@ public record LeaderboardEntryDto(
     string? PositionTitle,
     int? TotalXp,
     int? Level,
-    int? StreakDays
+    int? StreakDays,
+    string? Tier = null,
+    int? WeeklyXp = null
 );
 
 public record AssignCourseRequest(
@@ -118,4 +120,14 @@ public record AssignCourseRequest(
     int CourseId,
     bool IsMandatory,
     DateOnly? Deadline
+);
+
+public record XpBoostStatusDto(
+    bool IsActive,
+    DateTime? ActiveUntil,
+    int RemainingSeconds
+);
+
+public record ActivateBoostRequest(
+    int DurationMinutes = 30
 );

@@ -20,6 +20,8 @@ public partial class UserStat
 
     public DateOnly? LastActiveDate { get; set; }
 
+    public DateTime? BoostActiveUntil { get; set; }
+
     public DateTime UpdatedAt { get; set; }
 
     public virtual User User { get; set; } = null!;

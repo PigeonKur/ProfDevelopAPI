@@ -11,7 +11,7 @@ public interface IUserService
     Task<bool> DeactivateAsync(int id);
     Task<UserLookupsDto> GetLookupsAsync();
     Task<AdminStatsDto> GetAdminStatsAsync();
-    Task<List<LeaderboardEntryDto>> GetLeaderboardAsync();
+    Task<List<LeaderboardEntryDto>> GetLeaderboardAsync(string? tier = null);
     Task<List<AchievementDto>> GetUserAchievementsAsync(int userId, bool includeUnearned = false);
     Task<List<AchievementCatalogDto>> GetAchievementsAsync();
     Task<AchievementCatalogDto> CreateAchievementAsync(CreateAchievementRequest request);

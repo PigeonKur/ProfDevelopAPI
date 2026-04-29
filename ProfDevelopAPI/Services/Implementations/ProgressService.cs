@@ -19,6 +19,14 @@ public class ProgressService : IProgressService
                     && (request.Score * 100 / request.MaxScore) >= 70;
         var xpEarned = passed ? lesson.XpReward : 0;
 
+        // 2x XP boost: если у пользователя активен буст, удваиваем награду.
+        var preBoostStats = await _db.UserStats.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == userId);
+        var boostActive = preBoostStats?.BoostActiveUntil is { } until && until > DateTime.UtcNow;
+        if (boostActive && xpEarned > 0)
+        {
+            xpEarned *= 2;
+        }
+
         var progress = await _db.LessonProgresses
             .FirstOrDefaultAsync(p => p.UserId == userId && p.LessonId == request.LessonId);
 
@@ -208,15 +216,68 @@ public class ProgressService : IProgressService
         return true;
     }
 
+    public async Task<XpBoostStatusDto> ActivateXpBoostAsync(int userId, int durationMinutes)
+    {
+        var minutes = durationMinutes <= 0 ? 30 : Math.Min(durationMinutes, 240);
+        var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (stats == null)
+        {
+            stats = new UserStat { UserId = userId };
+            _db.UserStats.Add(stats);
+        }
+        var now = DateTime.UtcNow;
+        // Если буст ещё активен — продлеваем от его конца, иначе — от now.
+        var baseTime = stats.BoostActiveUntil is { } until && until > now ? until : now;
+        stats.BoostActiveUntil = baseTime.AddMinutes(minutes);
+        stats.UpdatedAt = now;
+        await _db.SaveChangesAsync();
+        return BuildBoostStatus(stats.BoostActiveUntil);
+    }
+
+    public async Task<XpBoostStatusDto> GetXpBoostStatusAsync(int userId)
+    {
+        var until = await _db.UserStats
+            .Where(s => s.UserId == userId)
+            .Select(s => s.BoostActiveUntil)
+            .FirstOrDefaultAsync();
+        return BuildBoostStatus(until);
+    }
+
+    private static XpBoostStatusDto BuildBoostStatus(DateTime? until)
+    {
+        var now = DateTime.UtcNow;
+        if (until is null || until <= now)
+            return new XpBoostStatusDto(false, null, 0);
+        var remaining = (int)Math.Round((until.Value - now).TotalSeconds);
+        return new XpBoostStatusDto(true, until, Math.Max(remaining, 0));
+    }
+
     public async Task<List<QuestionDto>> GetPracticeQuestionsAsync(int userId, int limit)
     {
-        // Берём все ID уроков, которые пользователь уже завершил.
-        var completedLessonIds = await _db.LessonProgresses
+        // Берём все ID уроков, которые пользователь уже завершил, плюс его
+        // прогресс по ним (для оценки «слабости»).
+        var lessonProgresses = await _db.LessonProgresses
             .Where(p => p.UserId == userId && p.IsCompleted)
-            .Select(p => p.LessonId)
+            .Select(p => new { p.LessonId, p.Score, p.MaxScore })
             .ToListAsync();
 
-        if (completedLessonIds.Count == 0) return new List<QuestionDto>();
+        if (lessonProgresses.Count == 0) return new List<QuestionDto>();
+
+        // weakness = 1 - score/maxScore. Чем хуже сдан урок, тем выше приоритет
+        // его вопросов в практике.
+        var weaknessByLesson = lessonProgresses
+            .GroupBy(p => p.LessonId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var maxSum = g.Sum(p => p.MaxScore);
+                    if (maxSum <= 0) return 0.5;
+                    var scoreSum = g.Sum(p => p.Score);
+                    return 1.0 - (double)scoreSum / maxSum;
+                });
+
+        var completedLessonIds = weaknessByLesson.Keys.ToList();
 
         var questions = await _db.Questions
             .Include(q => q.Answers)
@@ -226,9 +287,19 @@ public class ProgressService : IProgressService
             .ToListAsync();
 
         var rng = new Random();
-        var shuffled = questions.OrderBy(_ => rng.Next()).Take(limit > 0 ? limit : questions.Count);
+        var ordered = questions
+            .Select(q => new
+            {
+                Question = q,
+                Weakness = weaknessByLesson.TryGetValue(q.LessonId, out var w) ? w : 0.0,
+                Tie = rng.NextDouble()
+            })
+            .OrderByDescending(x => x.Weakness)
+            .ThenBy(x => x.Tie)
+            .Select(x => x.Question)
+            .Take(limit > 0 ? limit : questions.Count);
 
-        return shuffled.Select(q => new QuestionDto(
+        return ordered.Select(q => new QuestionDto(
             q.Id,
             q.Type,
             q.Text,

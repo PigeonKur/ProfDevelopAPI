@@ -110,20 +110,66 @@ public class UserService : IUserService
         );
     }
 
-    public async Task<List<LeaderboardEntryDto>> GetLeaderboardAsync()
+    public async Task<List<LeaderboardEntryDto>> GetLeaderboardAsync(string? tier = null)
     {
         var rows = await _db.VLeaderboards.ToListAsync();
-        return rows.Select(r => new LeaderboardEntryDto(
-            r.Rank,
-            r.Id ?? 0,
-            r.FullName ?? "",
-            r.AvatarUrl,
-            r.PositionTitle,
-            r.TotalXp,
-            r.Level,
-            r.StreakDays
-        )).ToList();
+
+        // Недельная XP: считаем сумму xp_earned за уроки, завершённые с
+        // понедельника 00:00 UTC. Сбрасывается еженедельно.
+        var now = DateTime.UtcNow;
+        var dow = (int)now.DayOfWeek; // Sunday=0..Saturday=6
+        var daysSinceMonday = (dow + 6) % 7;
+        var monday = now.Date.AddDays(-daysSinceMonday);
+        var weeklyXpByUser = await _db.LessonProgresses
+            .Where(p => p.CompletedAt != null && p.CompletedAt >= monday)
+            .GroupBy(p => p.UserId)
+            .Select(g => new { UserId = g.Key, Xp = g.Sum(p => p.XpEarned) })
+            .ToDictionaryAsync(x => x.UserId, x => x.Xp);
+
+        var entries = rows
+            .Select(r =>
+            {
+                var userId = r.Id ?? 0;
+                var totalXp = r.TotalXp ?? 0;
+                var weekly = weeklyXpByUser.TryGetValue(userId, out var w) ? w : 0;
+                return new LeaderboardEntryDto(
+                    r.Rank,
+                    userId,
+                    r.FullName ?? "",
+                    r.AvatarUrl,
+                    r.PositionTitle,
+                    r.TotalXp,
+                    r.Level,
+                    r.StreakDays,
+                    Tier: ComputeTier(totalXp),
+                    WeeklyXp: weekly
+                );
+            })
+            .ToList();
+
+        if (!string.IsNullOrWhiteSpace(tier))
+        {
+            var t = tier.Trim().ToLowerInvariant();
+            entries = entries
+                .Where(e => string.Equals(e.Tier, t, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(e => e.WeeklyXp)
+                .ThenByDescending(e => e.TotalXp)
+                .Take(30)
+                .Select((e, i) => e with { Rank = i + 1 })
+                .ToList();
+        }
+
+        return entries;
     }
+
+    private static string ComputeTier(int totalXp) => totalXp switch
+    {
+        >= 15000 => "legendary",
+        >= 5000 => "diamond",
+        >= 1500 => "gold",
+        >= 500 => "silver",
+        _ => "bronze"
+    };
 
     public async Task<List<AchievementDto>> GetUserAchievementsAsync(int userId, bool includeUnearned = false)
     {

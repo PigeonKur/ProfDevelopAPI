@@ -516,6 +516,7 @@ public partial class PostgresContext : DbContext
                 .ValueGeneratedNever()
                 .HasColumnName("user_id");
             entity.Property(e => e.LastActiveDate).HasColumnName("last_active_date");
+            entity.Property(e => e.BoostActiveUntil).HasColumnName("boost_active_until");
             entity.Property(e => e.Level)
                 .HasDefaultValue(1)
                 .HasColumnName("level");

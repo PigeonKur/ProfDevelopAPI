@@ -132,5 +132,6 @@ public record XpBoostStatusDto(
 );
 
 public record ActivateBoostRequest(
-    int DurationMinutes = 30
+    int DurationMinutes = 30,
+    int? DailyXpGoal = null
 );

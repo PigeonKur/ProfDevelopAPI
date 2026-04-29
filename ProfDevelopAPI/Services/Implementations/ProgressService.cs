@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using ProfDevelopAPI.Models;
 using ProfDevelopAPI.Models.DTOs;
 using ProfDevelopAPI.Services.Interfaces;
@@ -68,7 +68,7 @@ public class ProgressService : IProgressService
             stats.Level = CalculateLevel(stats.TotalXp);
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetLocalToday();
         if (stats.LastActiveDate == null || stats.LastActiveDate < today)
         {
             var yesterday = today.AddDays(-1);
@@ -267,7 +267,7 @@ public class ProgressService : IProgressService
         return true;
     }
 
-    public async Task<XpBoostStatusDto> ActivateXpBoostAsync(int userId, int durationMinutes)
+    public async Task<XpBoostStatusDto> ActivateXpBoostAsync(int userId, int durationMinutes, int? dailyXpGoal = null)
     {
         var minutes = durationMinutes <= 0 ? 30 : Math.Min(durationMinutes, 240);
         var stats = await _db.UserStats.FirstOrDefaultAsync(s => s.UserId == userId);
@@ -278,26 +278,26 @@ public class ProgressService : IProgressService
         }
         var now = DateTime.UtcNow;
         var (lessonsToday, xpToday) = await GetTodayProgressAsync(userId);
-        var eligible = lessonsToday >= BoostMinLessons || xpToday >= BoostMinXp;
+        var eligible = lessonsToday >= BoostMinLessons || xpToday >= ResolveBoostXpGoal(dailyXpGoal);
         if (!eligible)
         {
-            return BuildBoostStatus(stats.BoostActiveUntil, lessonsToday, xpToday);
+            return BuildBoostStatus(stats.BoostActiveUntil, lessonsToday, xpToday, dailyXpGoal);
         }
         // РљР°Р¶РґР°СЏ Р°РєС‚РёРІР°С†РёСЏ вЂ” С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕРµ РѕРєРЅРѕ РѕС‚ С‚РµРєСѓС‰РµРіРѕ РјРѕРјРµРЅС‚Р°, РЅРµ РЅР°РєРѕРїРёС‚РµР»СЊРЅРѕ.
         stats.BoostActiveUntil = now.AddMinutes(minutes);
         stats.UpdatedAt = now;
         await _db.SaveChangesAsync();
-        return BuildBoostStatus(stats.BoostActiveUntil, lessonsToday, xpToday);
+        return BuildBoostStatus(stats.BoostActiveUntil, lessonsToday, xpToday, dailyXpGoal);
     }
 
-    public async Task<XpBoostStatusDto> GetXpBoostStatusAsync(int userId)
+    public async Task<XpBoostStatusDto> GetXpBoostStatusAsync(int userId, int? dailyXpGoal = null)
     {
         var until = await _db.UserStats
             .Where(s => s.UserId == userId)
             .Select(s => s.BoostActiveUntil)
             .FirstOrDefaultAsync();
         var (lessonsToday, xpToday) = await GetTodayProgressAsync(userId);
-        return BuildBoostStatus(until, lessonsToday, xpToday);
+        return BuildBoostStatus(until, lessonsToday, xpToday, dailyXpGoal);
     }
 
     private const int BoostMinLessons = 3;
@@ -306,23 +306,31 @@ public class ProgressService : IProgressService
 
     private async Task<(int lessons, int xp)> GetTodayProgressAsync(int userId)
     {
-        var todayStart = DateTime.UtcNow.Date;
+        var localNow = GetLocalNow();
+        var localDayStart = localNow.Date;
+        var localNextDayStart = localDayStart.AddDays(1);
+        var utcDayStart = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localDayStart, DateTimeKind.Unspecified), AppTimeZone);
+        var utcNextDayStart = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localNextDayStart, DateTimeKind.Unspecified), AppTimeZone);
+
         var rows = await _db.LessonProgresses
-            .Where(p => p.UserId == userId && p.CompletedAt != null && p.CompletedAt >= todayStart)
+            .Where(p => p.UserId == userId && p.CompletedAt != null && p.CompletedAt >= utcDayStart && p.CompletedAt < utcNextDayStart)
             .Select(p => new { p.XpEarned })
             .ToListAsync();
         return (rows.Count, rows.Sum(x => x.XpEarned));
     }
 
-    private static XpBoostStatusDto BuildBoostStatus(DateTime? until, int lessonsToday = 0, int xpToday = 0)
+    private static XpBoostStatusDto BuildBoostStatus(DateTime? until, int lessonsToday = 0, int xpToday = 0, int? dailyXpGoal = null)
     {
-        var eligible = lessonsToday >= BoostMinLessons || xpToday >= BoostMinXp;
+        var eligible = lessonsToday >= BoostMinLessons || xpToday >= ResolveBoostXpGoal(dailyXpGoal);
         var now = DateTime.UtcNow;
         if (until is null || until <= now)
             return new XpBoostStatusDto(false, null, 0, lessonsToday, xpToday, eligible);
         var remaining = (int)Math.Round((until.Value - now).TotalSeconds);
         return new XpBoostStatusDto(true, until, Math.Max(remaining, 0), lessonsToday, xpToday, eligible);
     }
+
+    private static int ResolveBoostXpGoal(int? dailyXpGoal)
+        => dailyXpGoal.HasValue && dailyXpGoal.Value > 0 ? dailyXpGoal.Value : BoostMinXp;
 
     public async Task<List<QuestionDto>> GetPracticeQuestionsAsync(int userId, int limit)
     {
@@ -445,6 +453,24 @@ public class ProgressService : IProgressService
         );
     }
 
+
+    private static readonly TimeZoneInfo AppTimeZone = ResolveAppTimeZone();
+
+    private static TimeZoneInfo ResolveAppTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
+        }
+        catch
+        {
+            return TimeZoneInfo.Local;
+        }
+    }
+
+    private static DateTime GetLocalNow() => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, AppTimeZone);
+
+    private static DateOnly GetLocalToday() => DateOnly.FromDateTime(GetLocalNow());
     private static int CalculateLevel(int xp) => xp / 100 + 1;
 
     private async Task<List<AchievementDto>> CheckAchievementsAsync(int userId, UserStat stats)

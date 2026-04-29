@@ -11,6 +11,6 @@ public interface IProgressService
     Task<List<CourseDto>> GetUserCoursesAsync(int userId);
     Task<bool> AssignCourseAsync(AssignCourseRequest request, int assignedBy);
     Task<List<QuestionDto>> GetPracticeQuestionsAsync(int userId, int limit);
-    Task<XpBoostStatusDto> ActivateXpBoostAsync(int userId, int durationMinutes);
-    Task<XpBoostStatusDto> GetXpBoostStatusAsync(int userId);
+    Task<XpBoostStatusDto> ActivateXpBoostAsync(int userId, int durationMinutes, int? dailyXpGoal = null);
+    Task<XpBoostStatusDto> GetXpBoostStatusAsync(int userId, int? dailyXpGoal = null);
 }

@@ -26,5 +26,6 @@ public record UserProfileDto(
     int TotalXp,
     int Level,
     int StreakDays,
-    string? AvatarUrl
+    string? AvatarUrl,
+    DateOnly? LastActiveDate
 );

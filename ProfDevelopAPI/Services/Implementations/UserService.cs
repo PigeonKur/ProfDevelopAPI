@@ -172,6 +172,37 @@ public class UserService : IUserService
             ? 0
             : (int)Math.Round(attempts.Average(a => (double)a.Score / a.MaxScore * 100.0));
 
+        // Ретроспективно выдаём награды, по которым условие уже выполнено,
+        // но запись в user_achievements ещё не появилась (например, ачивки
+        // могли быть добавлены позже, чем юзер достиг условия).
+        var now = DateTime.UtcNow;
+        var newlyEarned = false;
+        foreach (var ach in allAchievements)
+        {
+            if (earnedMap.ContainsKey(ach.Id)) continue;
+            int? cur = ach.ConditionKey switch
+            {
+                "lessons_done" => lessonsDone,
+                "streak_days" => stats?.StreakDays ?? 0,
+                "total_xp" => stats?.TotalXp ?? 0,
+                "courses_done" => coursesDone,
+                "avg_score" => avgScore,
+                _ => null
+            };
+            if (cur is null) continue;
+            if (cur.Value < ach.ConditionValue) continue;
+
+            _db.UserAchievements.Add(new Models.UserAchievement
+            {
+                UserId = userId,
+                AchievementId = ach.Id,
+                EarnedAt = now
+            });
+            earnedMap[ach.Id] = now;
+            newlyEarned = true;
+        }
+        if (newlyEarned) await _db.SaveChangesAsync();
+
         return allAchievements.Select(ach =>
         {
             int? current = ach.ConditionKey switch

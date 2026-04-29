@@ -312,6 +312,15 @@ public class ProgressService : IProgressService
         var coursesCount = await _db.VCourseProgresses
             .CountAsync(p => p.UserId == userId && p.ProgressPct == 100);
 
+        // avg_score считаем на клиенте (EF не транслирует выражение со Score/MaxScore).
+        var attempts = await _db.LessonProgresses
+            .Where(p => p.UserId == userId && p.MaxScore > 0)
+            .Select(p => new { p.Score, p.MaxScore })
+            .ToListAsync();
+        var avgScore = attempts.Count == 0
+            ? 0
+            : (int)Math.Round(attempts.Average(a => (double)a.Score / a.MaxScore * 100.0));
+
         var newAchievements = new List<AchievementDto>();
 
         foreach (var ach in allAchievements.Where(a => !earnedIds.Contains(a.Id)))
@@ -322,6 +331,7 @@ public class ProgressService : IProgressService
                 "streak_days" => stats.StreakDays >= ach.ConditionValue,
                 "total_xp" => stats.TotalXp >= ach.ConditionValue,
                 "courses_done" => coursesCount >= ach.ConditionValue,
+                "avg_score" => avgScore >= ach.ConditionValue,
                 _ => false
             };
 

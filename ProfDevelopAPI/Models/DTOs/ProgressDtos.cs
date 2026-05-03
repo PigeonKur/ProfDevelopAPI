@@ -20,7 +20,8 @@ public record QuestionAttemptDto(
 public record QuestionCheckRequest(
     int QuestionId,
     List<int>? SelectedAnswerIds,
-    List<MatchingAttemptDto>? MatchingPairs
+    List<MatchingAttemptDto>? MatchingPairs,
+    string? Mode = null
 );
 
 public record MatchingAttemptDto(

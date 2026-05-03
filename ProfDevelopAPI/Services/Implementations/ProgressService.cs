@@ -123,6 +123,7 @@ public class ProgressService : IProgressService
             var attempt = await _db.QuestionAttempts
                 .FirstOrDefaultAsync(qa => qa.UserId == userId && qa.QuestionId == request.QuestionId);
             var nowUtc = DateTime.UtcNow;
+            var isPractice = string.Equals(request.Mode, "practice", StringComparison.OrdinalIgnoreCase);
             if (attempt == null)
             {
                 _db.QuestionAttempts.Add(new QuestionAttempt
@@ -135,7 +136,15 @@ public class ProgressService : IProgressService
             }
             else
             {
-                attempt.IsCorrect = result.IsCorrect;
+                // В режиме урока правильный повторный ответ НЕ "графует"
+                // вопрос. Иначе очередь "вернуть в конец" сама же лечит ошибку:
+                // вопрос автоматически становится IsCorrect=true и больше не
+                // попадает в практику. Поднять false→true может только практика.
+                var isUpgrade = !attempt.IsCorrect && result.IsCorrect;
+                if (isPractice || !isUpgrade)
+                {
+                    attempt.IsCorrect = result.IsCorrect;
+                }
                 attempt.LastAttemptAt = nowUtc;
             }
             await _db.SaveChangesAsync();
@@ -175,7 +184,14 @@ public class ProgressService : IProgressService
 
             if (existingAttempts.TryGetValue(question.Id, out var attempt))
             {
-                attempt.IsCorrect = evaluation.IsCorrect;
+                // Финальный submit урока никогда не апгрейдит false→true
+                // (см. CheckQuestionAsync — ту же логику, чтобы очередь
+                // "вернуть в конец" не графовала ошибочные вопросы).
+                var isUpgrade = !attempt.IsCorrect && evaluation.IsCorrect;
+                if (!isUpgrade)
+                {
+                    attempt.IsCorrect = evaluation.IsCorrect;
+                }
                 attempt.LastAttemptAt = nowUtc;
             }
             else

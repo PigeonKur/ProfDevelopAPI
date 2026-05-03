@@ -7,6 +7,12 @@ using ProfDevelopAPI.Models;
 using ProfDevelopAPI.Services.Implementations;
 using ProfDevelopAPI.Services.Interfaces;
 
+// Npgsql 6+ по умолчанию запрещает запись DateTime с Kind=Utc в timestamp without time zone.
+// Включаем legacy-режим, чтобы код мог продолжать работать с существующей схемой PostgreSQL,
+// где timestamp-колонки заведены без зоны (now() / timestamp без TZ). Это касается, в частности,
+// user_stats.boost_active_until — мы пишем туда DateTime.UtcNow, чтобы сравнивать с UtcNow при чтении.
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.ClearProviders();
